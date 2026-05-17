@@ -1,0 +1,63 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "scrape_jobs_total", "legendFormat": "jobs criados", "refId": "A" },
+        { "expr": "scrape_jobs_success_total", "legendFormat": "sucesso", "refId": "B" },
+        { "expr": "scrape_jobs_failed_total", "legendFormat": "erro", "refId": "C" }
+      ],
+      "title": "Jobs por status",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "captcha_detected_total", "legendFormat": "detectados", "refId": "A" },
+        { "expr": "captcha_solved_total", "legendFormat": "resolvidos", "refId": "B" },
+        { "expr": "captcha_failed_total", "legendFormat": "falhas", "refId": "C" }
+      ],
+      "title": "Captchas locais",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "expr": "proxy_selected_total", "legendFormat": "proxies selecionados", "refId": "A" },
+        { "expr": "proxy_cooldown_total", "legendFormat": "cooldowns", "refId": "B" },
+        { "expr": "proxy_active_jobs", "legendFormat": "{{proxy}}", "refId": "C" }
+      ],
+      "title": "Proxy rotation local",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["scraping", "python", "observability"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "ScaleScrape Lab",
+  "uid": "scalescrape-lab",
+  "version": 1,
+  "weekStart": ""
+}

@@ -1,8 +1,9 @@
-# ScaleScrape Lab Python
+# ScaleScrape Lab
 
 Laboratorio controlado de scraping em escala com Python, RabbitMQ, Playwright,
-PostgreSQL, Prometheus, Grafana, anti-bot simulator, proxy rotation local e
-captcha proprio resolvido opcionalmente via 2Captcha.
+PostgreSQL, Prometheus, Grafana, target-site em Next.js/TypeScript, anti-bot
+simulator, proxy rotation local e captcha proprio resolvido opcionalmente via
+2Captcha.
 
 O objetivo e mostrar arquitetura de scraping em producao: filas, workers,
 controle de concorrencia, retry/backoff, DLQ, circuit breaker, politicas de
@@ -37,14 +38,16 @@ Captcha proprio
 
 ## Stack
 
-- Python + FastAPI para API e target-site
+- Python + FastAPI para API de orquestracao
+- Next.js 16 + TypeScript para target-site fake visual
 - Celery + RabbitMQ para filas
 - Playwright Python para scraping
 - PostgreSQL com SQLAlchemy
 - Prometheus + Grafana para monitoramento
 - 2Captcha somente para captcha proprio/local
 - Docker Compose para infraestrutura local
-- `unittest` para validacoes de policy e simuladores
+- `unittest` para policies do worker
+- Node test runner + TypeScript para dataset, anti-bot e componentes do target-site
 
 ## Como Rodar
 
@@ -61,10 +64,13 @@ Servicos:
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000
 
-## Target-Site Visual
+## Target-Site Visual Em Next.js
 
-O target-site e uma vitrine local do simulador. A home (`/`) mostra os cenarios
-disponiveis e as paginas de dados preservam os seletores usados pelo Playwright:
+O target-site e uma vitrine local do simulador em Next.js 16 com App Router. O
+visual foi inspirado na linguagem de protecao ao credito, prevencao a fraudes,
+onboarding e monitoramento continuo usada pela Procob, sem copiar assets
+proprietarios. A home (`/`) mostra os cenarios disponiveis e as paginas de dados
+preservam os seletores usados pelo Playwright:
 
 - `/items?page=1`: dataset local sintetico, paginado e estavel
 - `/protected/items?page=1`: dataset sob anti-bot local, com session, risco e challenge
@@ -153,10 +159,19 @@ Este projeto nao faz:
 
 ## Testes
 
-Sem Docker, e possivel validar as regras puras com o Python local:
+Sem Docker, e possivel validar as regras puras do worker com o Python local:
 
 ```powershell
 python -m unittest discover -s tests -v
+```
+
+Para validar o target-site Next.js:
+
+```powershell
+cd apps\target_site
+npm test
+npm run typecheck
+npm run build
 ```
 
 No ambiente Codex, foi usado o Python embutido:

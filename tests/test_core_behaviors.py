@@ -19,6 +19,7 @@ def load_module(name: str, path: Path):
 target_antibot = load_module("target_antibot", ROOT / "apps" / "target_site" / "app" / "antibot.py")
 target_captcha = load_module("target_captcha", ROOT / "apps" / "target_site" / "app" / "captcha.py")
 target_fake_data = load_module("target_fake_data", ROOT / "apps" / "target_site" / "app" / "fake_data.py")
+target_views = load_module("target_views", ROOT / "apps" / "target_site" / "app" / "views.py")
 worker_policy = load_module("worker_policy", ROOT / "apps" / "worker" / "app" / "policy.py")
 worker_proxy = load_module("worker_proxy", ROOT / "apps" / "worker" / "app" / "proxy" / "manager.py")
 sys.path.insert(0, str(ROOT / "apps" / "worker"))
@@ -34,6 +35,8 @@ CaptchaStore = target_captcha.CaptchaStore
 get_local_records = target_fake_data.get_local_records
 normalize_randomuser_payload = target_fake_data.normalize_randomuser_payload
 paginate_records = target_fake_data.paginate_records
+render_home = target_views.render_home
+render_items_page = target_views.render_items_page
 PolicyError = worker_policy.PolicyError
 ensure_host_allowed = worker_policy.ensure_host_allowed
 ProxyManager = worker_proxy.ProxyManager
@@ -185,6 +188,31 @@ class TargetFakeDataTests(unittest.TestCase):
         self.assertIn("Brazil", records[0].title)
         self.assertNotIn("fake@example.test", records[0].raw_summary)
         self.assertNotIn("000", records[0].raw_summary)
+
+
+class TargetViewTests(unittest.TestCase):
+    def test_items_page_preserves_scraper_selectors_and_next_link(self) -> None:
+        records = get_local_records(prefix="normal", total=15)
+        page = paginate_records(records, page_number=1, per_page=5)
+        html = render_items_page(
+            title="Fonte publica",
+            subtitle="Dataset sintetico local",
+            page=page,
+            route="/items",
+        )
+        self.assertIn('class="item-card"', html)
+        self.assertIn('class="item-title"', html)
+        self.assertIn('class="detail-link"', html)
+        self.assertIn('class="next-page"', html)
+        self.assertIn("Registro publico 001", html)
+
+    def test_home_exposes_visual_scenario_links(self) -> None:
+        html = render_home(local_total=240, external_total=500)
+        self.assertIn("ScaleScrape Target Lab", html)
+        self.assertIn("/items?page=1", html)
+        self.assertIn("/protected/items?page=1", html)
+        self.assertIn("/external/items?page=1", html)
+        self.assertIn("/layout-changed/items", html)
 
 
 if __name__ == "__main__":

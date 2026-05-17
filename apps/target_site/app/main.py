@@ -8,6 +8,14 @@ from pydantic import BaseModel
 
 from app.antibot import AntibotAction, AntibotSimulator
 from app.captcha import CaptchaStore
+from app.fake_data import find_record, get_external_records, get_local_records, paginate_records
+from app.views import (
+    render_challenge_page,
+    render_detail_page,
+    render_home,
+    render_items_page,
+    render_layout_changed_page,
+)
 
 app = FastAPI(title="ScaleScrape Lab Target Site", version="0.1.0")
 antibot = AntibotSimulator()
@@ -22,58 +30,49 @@ class CaptchaVerifyPayload(BaseModel):
     proxy_id: str = "direct"
 
 
-def page(title: str, body: str) -> HTMLResponse:
-    return HTMLResponse(
-        f"""
-        <!doctype html>
-        <html lang="pt-BR">
-          <head>
-            <meta charset="utf-8" />
-            <title>{title}</title>
-          </head>
-          <body>
-            <main>{body}</main>
-          </body>
-        </html>
-        """
-    )
-
-
-def render_items(prefix: str, page_number: int, protected: bool = False) -> HTMLResponse:
-    items = []
-    for index in range(1, 6):
-        item_id = ((page_number - 1) * 5) + index
-        items.append(
-            f"""
-            <article class="item-card" data-item-id="{prefix}-{item_id}">
-              <h2 class="item-title">Registro publico {item_id}</h2>
-              <a class="detail-link" href="/items/{prefix}-{item_id}">Detalhe</a>
-            </article>
-            """
-        )
-    next_link = ""
-    if page_number < 3:
-        route = "/protected/items" if protected else "/items"
-        next_link = f'<a class="next-page" href="{route}?page={page_number + 1}">Proxima</a>'
-    return page("ScaleScrape Target", "\n".join(items) + next_link)
+@app.get("/", response_class=HTMLResponse)
+def home() -> HTMLResponse:
+    return HTMLResponse(render_home(local_total=240, external_total=500))
 
 
 @app.get("/items", response_class=HTMLResponse)
 def items(page: int = 1) -> HTMLResponse:
-    return render_items("normal", page)
+    records = get_local_records(prefix="normal", total=240)
+    current_page = paginate_records(records, page_number=page, per_page=12)
+    return HTMLResponse(
+        render_items_page(
+            title="Dataset publico sintetico",
+            subtitle="Fonte local estavel para scraping paginado.",
+            page=current_page,
+            route="/items",
+            detail_route="/items",
+        )
+    )
 
 
 @app.get("/items/{item_id}", response_class=HTMLResponse)
 def item_detail(item_id: str) -> HTMLResponse:
-    return page(
-        "Detalhe",
-        f"""
-        <section class="item-detail" data-item-id="{item_id}">
-          <h1>Detalhe {item_id}</h1>
-          <p class="status">Fonte publica simulada</p>
-        </section>
-        """,
+    return HTMLResponse(render_detail_page(find_record(item_id)))
+
+
+@app.get("/external/items", response_class=HTMLResponse)
+def external_items(page: int = 1) -> HTMLResponse:
+    records = list(get_external_records(size=500))
+    current_page = paginate_records(records, page_number=page, per_page=12)
+    return HTMLResponse(
+        render_items_page(
+            title="Fonte fake externa em massa",
+            subtitle="RandomUser normalizado com cache e fallback local.",
+            page=current_page,
+            route="/external/items",
+            detail_route="/external/items",
+        )
     )
+
+
+@app.get("/external/items/{item_id}", response_class=HTMLResponse)
+def external_item_detail(item_id: str) -> HTMLResponse:
+    return HTMLResponse(render_detail_page(find_record(item_id)))
 
 
 @app.get("/protected/items", response_class=HTMLResponse)
@@ -112,18 +111,19 @@ def protected_items(
         sleep(0.4)
     if decision.action == AntibotAction.CHALLENGE:
         challenge = captcha_store.create()
-        return page(
-            "Challenge",
-            f"""
-            <section id="captcha-challenge" data-challenge-id="{challenge.challenge_id}">
-              <h1>Verificacao local</h1>
-              <img id="captcha-image" src="/captcha/image/{challenge.challenge_id}" alt="captcha local" />
-              <p>Este captcha pertence ao proprio laboratorio.</p>
-            </section>
-            """,
-        )
+        return HTMLResponse(render_challenge_page(challenge.challenge_id))
 
-    return render_items("protected", page, protected=True)
+    records = get_local_records(prefix="protected", total=240)
+    current_page = paginate_records(records, page_number=page, per_page=12)
+    return HTMLResponse(
+        render_items_page(
+            title="Dataset protegido",
+            subtitle="Mesmo conteudo sintetico sob avaliacao anti-bot local.",
+            page=current_page,
+            route="/protected/items",
+            detail_route="/items",
+        )
+    )
 
 
 @app.get("/captcha/image/{challenge_id}")
@@ -158,19 +158,22 @@ def forbidden_items() -> None:
 def unstable_items(page: int = 1) -> HTMLResponse:
     if page % 2 == 0:
         raise HTTPException(status_code=500, detail="erro intermitente simulado")
-    return render_items("unstable", page)
+    records = get_local_records(prefix="unstable", total=120)
+    current_page = paginate_records(records, page_number=page, per_page=12)
+    return HTMLResponse(
+        render_items_page(
+            title="Fonte instavel",
+            subtitle="Paginas pares retornam erro 500 para validar retry.",
+            page=current_page,
+            route="/unstable/items",
+            detail_route="/items",
+        )
+    )
 
 
 @app.get("/layout-changed/items", response_class=HTMLResponse)
 def layout_changed_items() -> HTMLResponse:
-    return page(
-        "Layout alterado",
-        """
-        <section class="changed-layout">
-          <div data-record="layout-1">Registro sem seletores esperados</div>
-        </section>
-        """,
-    )
+    return HTMLResponse(render_layout_changed_page())
 
 
 @app.get("/antibot/debug/session")

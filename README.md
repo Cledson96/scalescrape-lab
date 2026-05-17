@@ -56,10 +56,27 @@ docker compose up --build
 Servicos:
 
 - API: http://localhost:8000/docs
-- Target-site: http://localhost:4000
+- Target-site visual: http://localhost:4000
 - RabbitMQ UI: http://localhost:15672
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000
+
+## Target-Site Visual
+
+O target-site e uma vitrine local do simulador. A home (`/`) mostra os cenarios
+disponiveis e as paginas de dados preservam os seletores usados pelo Playwright:
+
+- `/items?page=1`: dataset local sintetico, paginado e estavel
+- `/protected/items?page=1`: dataset sob anti-bot local, com session, risco e challenge
+- `/external/items?page=1`: massa fake externa via RandomUser, com fallback local
+- `/rate-limited/items`: resposta `429` para testar retry e cooldown
+- `/forbidden/items`: resposta `403` para testar bloqueio
+- `/unstable/items?page=1`: paginas pares retornam `500`
+- `/layout-changed/items`: pagina sem `.item-card` para testar quebra de seletor
+
+A fonte externa usa dados fake normalizados e nao expoe e-mail, telefone ou
+documento. Se a API externa estiver indisponivel, o simulador usa uma massa
+local deterministica para manter a demo funcionando.
 
 ## Como Criar Um Job
 
@@ -78,6 +95,7 @@ Outros cenarios:
 
 ```text
 http://target-site:4000/items?page=1
+http://target-site:4000/external/items?page=1
 http://target-site:4000/rate-limited/items?page=1
 http://target-site:4000/forbidden/items?page=1
 http://target-site:4000/unstable/items?page=1

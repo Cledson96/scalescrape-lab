@@ -11,7 +11,9 @@ seguranca, metricas e observabilidade. Tudo roda contra um target-site local do
 proprio projeto.
 
 Os itens extraidos sao persistidos no PostgreSQL em `scraped_items`, com
-`created_at` e `extracted_at` representando a data/hora da extracao.
+`created_at` e `extracted_at` representando a data/hora da extracao. Imagens
+coletadas no scraper da Globo ficam em um volume Docker compartilhado e sao
+servidas pela API em `/media`.
 
 Para uma explicacao detalhada do fluxo do job, veja
 [docs/fluxo-scraping.md](docs/fluxo-scraping.md).
@@ -133,18 +135,35 @@ Depois que o job terminar, veja os registros extraidos em:
 
 ```text
 GET /items
+GET /items/page?source=globo-home&page=1&page_size=10
 GET /jobs/{job_id}/items
 ```
 
 Cada item retorna `extracted_at` e tambem grava esse horario em `raw_data` para
 facilitar a demonstracao do momento em que o dado foi coletado.
 
+Para noticias publicas da Globo, use:
+
+```json
+{
+  "source": "globo-home",
+  "start_url": "https://www.globo.com/",
+  "mode": "browser",
+  "max_pages": 1
+}
+```
+
+Esse fluxo le os cards publicos da home, agrupa por categoria visual, abre a
+noticia para enriquecer titulo/resumo, baixa a imagem para o volume local e
+salva `image_public_path` em `raw_data`.
+
 Visualmente, a rota `/dashboard` do target-site mostra:
 
 - tabela de jobs recentes;
-- tabela de itens extraidos salvos no Postgres;
+- tabelas paginadas separadas para fake-target, Books to Scrape e Globo;
 - `public_url` para o dominio publico da demo;
-- botoes para consultar agora o target protegido, Books to Scrape ou os dois.
+- thumbnails da Globo servidas pela API;
+- botoes para consultar agora cada fonte ou todas juntas.
 
 Em dev, acesse:
 
@@ -155,20 +174,25 @@ https://dev.scalescrape.cledson.com.br/dashboard
 ## Agendamento A Cada 6 Horas
 
 O projeto inclui um servico `scheduler` com Celery Beat. Ele funciona como um
-cron job e dispara automaticamente, a cada 6 horas, dois scrapings de demo:
+cron job e dispara automaticamente, a cada 6 horas, tres scrapings de demo:
 
 - `fake-target`: `http://target-site:4000/protected/items?page=1`
 - `books-to-scrape`: `https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html`
+- `globo-home`: `https://www.globo.com/`
 
 Configuracao:
 
 ```env
 PUBLIC_TARGET_SITE_URL=https://dev.scalescrape.cledson.com.br
+PUBLIC_API_URL=https://api-dev.scalescrape.cledson.com.br
 SCALESCRAPE_API_URL=http://api:8000
+MEDIA_ROOT=/app/media
 ENABLE_SCHEDULED_SCRAPING=true
 SCHEDULED_SCRAPE_INTERVAL_SECONDS=21600
 SCHEDULED_PROTECTED_TARGET_URL=http://target-site:4000/protected/items?page=1
 SCHEDULED_BOOKS_TO_SCRAPE_URL=https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
+SCHEDULED_GLOBO_HOME_URL=https://www.globo.com/
+GLOBO_MAX_ARTICLES=12
 ```
 
 Outros cenarios do target controlado:
@@ -229,6 +253,12 @@ proprio projeto ou ambientes explicitamente autorizados.
 Para Books to Scrape, o worker usa o layout `article.product_pod`, abre cada
 pagina de detalhe do livro, le `#product_description + p` e grava os campos
 normalizados em `raw_data`.
+
+Para Globo, o worker usa a home publica `https://www.globo.com/`, coleta links
+`.post__link`, abre as paginas `.ghtml`, usa metadados `og:title`,
+`og:description` e `og:image`, baixa a imagem para `MEDIA_ROOT/globo` e grava
+no item os campos `category`, `description`, `image_original_url`,
+`image_path` e `image_public_path`.
 
 ## Deploy Na VPS
 

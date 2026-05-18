@@ -40,10 +40,11 @@ publica a tarefa `app.tasks.run_scrape_job` na fila `scrape.jobs`.
 
 Tambem existe o fluxo automatico: o servico `scheduler`, rodando Celery Beat,
 dispara `app.tasks.enqueue_scheduled_scrape_jobs` a cada 21600 segundos
-(6 horas). Essa tarefa cria dois jobs:
+(6 horas). Essa tarefa cria tres jobs:
 
 - target protegido do laboratorio;
-- Books to Scrape na categoria Science Fiction.
+- Books to Scrape na categoria Science Fiction;
+- Globo Home para noticias publicas da home.
 
 Para demonstrar um segundo scraping externo seguro, use a fonte
 `books-to-scrape`:
@@ -52,6 +53,17 @@ Para demonstrar um segundo scraping externo seguro, use a fonte
 {
   "source": "books-to-scrape",
   "start_url": "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
+  "mode": "browser",
+  "max_pages": 1
+}
+```
+
+Para demonstrar scraping de noticias publicas com imagem local, use:
+
+```json
+{
+  "source": "globo-home",
+  "start_url": "https://www.globo.com/",
   "mode": "browser",
   "max_pages": 1
 }
@@ -129,6 +141,14 @@ No Books to Scrape, o worker usa outro adaptador:
 - extrai a descricao em `#product_description + p`;
 - grava tambem o preco convertido para BRL usando `GBP_TO_BRL_RATE`.
 
+Na Globo, o worker usa um adaptador dedicado:
+
+- lista links publicos `.post__link` na home;
+- identifica categoria pelo bloco visual `data-tracking-action`;
+- abre paginas `.ghtml` para ler `og:title`, `og:description` e `og:image`;
+- baixa imagens permitidas de `*.glbimg.com` para `MEDIA_ROOT/globo`;
+- grava `image_public_path` para que a API sirva a thumbnail em `/media`.
+
 ## 6. Persistencia E Status
 
 Ao final, os dados vao para `scraped_items`. O campo `created_at` e exposto pela
@@ -150,13 +170,16 @@ Os dados coletados podem ser vistos pela API:
 
 ```text
 GET /items
+GET /items/page?source=globo-home&page=1&page_size=10
 GET /jobs/{job_id}/items
 ```
 
 Tambem ha uma vitrine visual em `/dashboard` no target-site. Ela consulta a API
 server-side por `SCALESCRAPE_API_URL`, mostra `public_url`/`public_detail_url`
 para trocar `http://target-site:4000` pelo dominio publico do ambiente, e possui
-botoes para criar jobs imediatos dos dois scrapers.
+botoes para criar jobs imediatos dos tres scrapers. O dashboard mostra tabelas
+paginadas separadas para fake-target, Books to Scrape e Globo; as imagens da
+Globo sao servidas pela API com `PUBLIC_API_URL`.
 
 O target-site tambem tem uma fonte dinamica propria: `/external/items` busca a
 API real RandomUser, normaliza os dados sem expor e-mail/telefone/documento, usa

@@ -24,6 +24,7 @@ class Settings:
     scraper_max_attempts: int = int(os.getenv("SCRAPER_MAX_ATTEMPTS", "3"))
     scraper_page_timeout_seconds: int = int(os.getenv("SCRAPER_PAGE_TIMEOUT_SECONDS", "30"))
     scraper_job_timeout_seconds: int = int(os.getenv("SCRAPER_JOB_TIMEOUT_SECONDS", "180"))
+    gbp_to_brl_rate: float = float(os.getenv("GBP_TO_BRL_RATE", "6.50"))
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -34,7 +35,8 @@ class Settings:
         object.__setattr__(
             self,
             "allowed_proxy_target_hosts",
-            csv_env("ALLOWED_PROXY_TARGET_HOSTS", "target-site,localhost,127.0.0.1"),
+            csv_env("ALLOWED_PROXY_TARGET_HOSTS", "target-site,localhost,127.0.0.1")
+            | {"books.toscrape.com"},
         )
 
 

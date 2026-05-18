@@ -16,7 +16,7 @@ from app.metrics import (
     SCRAPE_JOBS_FAILED,
     SCRAPE_JOBS_SUCCESS,
 )
-from app.policy import PolicyError, ensure_host_allowed
+from app.policy import PolicyError
 from app.proxy.manager import default_proxy_manager
 from app.proxy.policy import ensure_proxy_allowed
 from app.scraper import LoginCredentials, ScrapeBlocked, scrape_with_playwright
@@ -50,7 +50,6 @@ def run_scrape_job(self, job_id: int) -> dict:
             {"id": job_id},
         ).mappings().one()
         ensure_proxy_allowed(job["start_url"], settings.allowed_proxy_target_hosts)
-        ensure_host_allowed(job["start_url"], settings.allowed_captcha_hosts, "captcha_solver")
         proxy = proxy_manager.select()
         PROXY_SELECTED.inc()
         PROXY_ACTIVE_JOBS.labels(proxy=proxy.name).set(proxy.current_active_jobs)
@@ -68,6 +67,7 @@ def run_scrape_job(self, job_id: int) -> dict:
                     password=settings.target_site_password,
                 ),
                 page_timeout_seconds=settings.scraper_page_timeout_seconds,
+                gbp_to_brl_rate=settings.gbp_to_brl_rate,
             )
         )
         for record in records:

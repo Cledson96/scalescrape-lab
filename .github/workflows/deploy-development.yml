@@ -164,7 +164,8 @@ jobs:
             TARGET_SITE_USERNAME=demo
             TARGET_SITE_PASSWORD=demo123
             ENABLE_PROXY_ROTATION=true
-            ALLOWED_PROXY_TARGET_HOSTS=target-site,localhost,127.0.0.1
+            ALLOWED_PROXY_TARGET_HOSTS=target-site,localhost,127.0.0.1,books.toscrape.com
+            GBP_TO_BRL_RATE=6.50
             SCRAPER_MAX_ATTEMPTS=3
             SCRAPER_PAGE_TIMEOUT_SECONDS=120
             SCRAPER_JOB_TIMEOUT_SECONDS=300

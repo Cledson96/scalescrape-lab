@@ -2,13 +2,16 @@
 
 Laboratorio controlado de scraping em escala com Python, RabbitMQ, Playwright,
 PostgreSQL, Prometheus, Grafana, target-site em Next.js/TypeScript, anti-bot
-simulator, proxy rotation local e captcha proprio resolvido opcionalmente via
-2Captcha.
+simulator, proxy rotation local, login protegido e CAPTCHA configuravel para
+ambiente de laboratorio.
 
 O objetivo e mostrar arquitetura de scraping em producao: filas, workers,
 controle de concorrencia, retry/backoff, DLQ, circuit breaker, politicas de
 seguranca, metricas e observabilidade. Tudo roda contra um target-site local do
 proprio projeto.
+
+Para uma explicacao detalhada do fluxo do job, veja
+[docs/fluxo-scraping.md](docs/fluxo-scraping.md).
 
 ## Arquitetura
 
@@ -17,23 +20,23 @@ Usuario / Swagger
         ↓
 FastAPI API
         ↓
-PostgreSQL
+PostgreSQL + job_events
         ↓
 RabbitMQ
         ↓
 Celery Workers
         ↓
-Playwright
+Playwright headless
         ↓
 Proxy Manager
         ↓
 Target Site Fake
         ↓
+Login protegido
+        ↓
+CAPTCHA de laboratorio
+        ↓
 Anti-Bot Simulator
-        ↓
-Captcha proprio
-        ↓
-2Captcha somente se habilitado e permitido por whitelist
 ```
 
 ## Stack
@@ -44,7 +47,7 @@ Captcha proprio
 - Playwright Python para scraping
 - PostgreSQL com SQLAlchemy
 - Prometheus + Grafana para monitoramento
-- 2Captcha somente para captcha proprio/local
+- Provider de CAPTCHA plugavel, com mock local por padrao
 - Docker Compose para infraestrutura local
 - `unittest` para policies do worker
 - Node test runner + TypeScript para dataset, anti-bot e componentes do target-site
@@ -69,14 +72,16 @@ Servicos:
 O target-site e uma vitrine local do simulador em Next.js 16 com App Router. O
 visual foi inspirado na linguagem de protecao ao credito, prevencao a fraudes,
 onboarding e monitoramento continuo usada pela Procob, sem copiar assets
-proprietarios. O portal inteiro exige login fake com captcha local antes de
-mostrar qualquer pagina de dados; sem cookie `lab_auth=ok`, `/`, `/items`,
-`/external/items` e demais rotas redirecionam para `/login`. Depois do login, a
-home (`/`) mostra os cenarios disponiveis e as paginas de dados preservam os
-seletores usados pelo Playwright:
+proprietarios.
+
+O portal inteiro exige login fake antes de mostrar qualquer pagina de dados; sem
+cookie `lab_auth=ok`, `/`, `/items`, `/external/items` e demais rotas
+redirecionam para `/login`. O login valida usuario, senha e CAPTCHA no servidor.
+Depois do login, a home (`/`) mostra os cenarios disponiveis e as paginas de
+dados preservam os seletores usados pelo Playwright:
 
 - `/items?page=1`: dataset local sintetico, paginado e estavel
-- `/login?next=/protected/items?page=1`: login fake com captcha local
+- `/login?next=/protected/items?page=1`: login fake com CAPTCHA de laboratorio
 - `/protected/items?page=1`: dataset sob login, anti-bot local, session, risco e challenge
 - `/external/items?page=1`: massa fake externa via RandomUser, com fallback local
 - `/rate-limited/items`: resposta `429` para testar retry e cooldown
@@ -112,11 +117,12 @@ http://target-site:4000/unstable/items?page=1
 http://target-site:4000/layout-changed/items?page=1
 ```
 
-## Captcha Local Com 2Captcha
+## Login, CAPTCHA E Uso Seguro
 
-Por padrao, o projeto usa `MockCaptchaResolverProvider`. O target-site exige
-login antes de qualquer pagina do portal; o worker detecta `#login-form`, preenche
-`TARGET_SITE_USERNAME` e `TARGET_SITE_PASSWORD`, resolve `#captcha-image` e
+Por padrao, o projeto usa `MockCaptchaResolverProvider` para desenvolvimento
+local. O target-site exige login antes de qualquer pagina do portal; o worker
+detecta `#login-form`, preenche `TARGET_SITE_USERNAME` e
+`TARGET_SITE_PASSWORD`, passa pela etapa de CAPTCHA configurada no laboratorio e
 continua a raspagem dos `.item-card`.
 
 Credenciais demo:
@@ -126,22 +132,34 @@ TARGET_SITE_USERNAME=demo
 TARGET_SITE_PASSWORD=demo123
 ```
 
-No deploy da VPS, o captcha do login gera uma resposta aleatoria por desafio e
-o worker precisa resolver a imagem via 2Captcha real. Para rodar localmente sem
-gastar creditos, o `docker-compose.yml` define
-`TARGET_SITE_FIXED_CAPTCHA_ANSWER=ABCDE` apenas no target-site local.
+Variaveis de CAPTCHA usadas pelo target-site:
 
-Para demonstrar 2Captcha real no captcha proprio/local:
-
-```env
-ENABLE_REAL_2CAPTCHA=true
-TWO_CAPTCHA_API_KEY=sua_chave
-ALLOWED_CAPTCHA_HOSTS=target-site,localhost,127.0.0.1
-MAX_CAPTCHA_SOLVES_PER_RUN=20
+```text
+RECAPTCHA_SITE_KEY
+RECAPTCHA_SECRET_KEY
 ```
 
-O provider valida o host antes de chamar a API externa. Se o host nao estiver na
-whitelist, o job e bloqueado por policy.
+No desenvolvimento local, `.env.example` traz chaves de teste do Google para
+permitir a validacao da tela sem configurar uma conta real. Em deploy, as chaves
+devem vir dos GitHub Secrets.
+
+O worker tambem valida `ALLOWED_CAPTCHA_HOSTS` antes de usar qualquer provider
+externo. Este laboratorio deve ser usado apenas contra o target controlado do
+proprio projeto ou ambientes explicitamente autorizados.
+
+### Fluxo Resumido
+
+1. `POST /jobs` cria um job no Postgres e publica uma tarefa em `scrape.jobs`.
+2. O worker Celery seleciona um proxy logico (`proxy-a`, `proxy-b`, `proxy-c`).
+3. O Playwright abre a URL protegida e e redirecionado para `/login`.
+4. O worker preenche usuario/senha, passa pelo CAPTCHA do laboratorio e recebe
+   os cookies `lab_auth=ok` e `lab_clearance=ok`.
+5. A pagina protegida roda o anti-bot local e pode liberar, atrasar, desafiar ou
+   bloquear.
+6. Com acesso liberado, o worker extrai `.item-card`, `.item-title` e
+   `.detail-link`.
+7. Os itens sao gravados em `scraped_items`; o job passa para `success`,
+   `failed`, `blocked`, `rate_limited` ou `blocked_by_policy`.
 
 ## Deploy Na VPS
 
@@ -183,6 +201,8 @@ VPS_SSH_KEY
 DEVELOPMENT_VPS_APP_DIR
 PRODUCTION_VPS_APP_DIR
 TWO_CAPTCHA_API_KEY
+RECAPTCHA_SITE_KEY
+RECAPTCHA_SECRET_KEY
 DEVELOPMENT_TARGET_SITE_PORT
 DEVELOPMENT_API_PORT
 DEVELOPMENT_GRAFANA_PORT
@@ -222,7 +242,7 @@ em cooldown.
 
 Este projeto pode:
 
-- usar 2Captcha apenas contra captcha proprio/local
+- demonstrar login protegido e CAPTCHA em target controlado de laboratorio
 - simular anti-bot no target-site proprio
 - simular proxy rotation em ambiente local
 - simular 403, 429, timeout e challenge
@@ -231,7 +251,7 @@ Este projeto pode:
 Este projeto nao faz:
 
 - bypass de Cloudflare real
-- resolucao de captcha de terceiros
+- resolucao de CAPTCHA em sites de terceiros
 - proxy rotation contra sites reais
 - coleta de dados pessoais reais
 - scraping agressivo em sites reais

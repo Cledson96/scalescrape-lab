@@ -1,5 +1,4 @@
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
 import React from "react";
 
 import { ChallengePage } from "../../../components/challenge-page";
@@ -20,10 +19,6 @@ export default async function Page({ searchParams }: PageProps) {
     cookies()
   ]);
   const pageNumber = getPageNumber(params);
-  if (cookieStore.get("lab_auth")?.value !== "ok") {
-    redirect(`/login?next=${encodeURIComponent(`/protected/items?page=${pageNumber}`)}`);
-  }
-
   const proxyId = headerStore.get("x-lab-proxy-id") ?? "direct";
   const sessionId = cookieStore.get("lab_session")?.value ?? `anonymous-${proxyId}`;
   const decision = antibotSimulator.evaluate({

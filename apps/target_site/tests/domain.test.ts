@@ -7,7 +7,7 @@ import {
   paginateRecords
 } from "../src/lib/data";
 import { AntibotAction, AntibotSimulator } from "../src/lib/antibot";
-import { normalizeNextPath, validateLoginCredentials } from "../src/lib/auth";
+import { isPublicTargetPath, normalizeNextPath, validateLoginCredentials } from "../src/lib/auth";
 import { CaptchaStore, captchaStore } from "../src/lib/captcha";
 import { POST as submitLogin } from "../src/app/login/submit/route";
 
@@ -114,6 +114,21 @@ test("login next path only allows local relative paths", () => {
   assert.equal(normalizeNextPath("https://example.com/phish"), "/protected/items?page=1");
   assert.equal(normalizeNextPath("//example.com/phish"), "/protected/items?page=1");
   assert.equal(normalizeNextPath("/login?next=/admin"), "/protected/items?page=1");
+});
+
+test("target-site only leaves login, captcha and assets public", () => {
+  assert.equal(isPublicTargetPath("/login"), true);
+  assert.equal(isPublicTargetPath("/login/submit"), true);
+  assert.equal(isPublicTargetPath("/captcha/image/challenge-1"), true);
+  assert.equal(isPublicTargetPath("/captcha/verify"), true);
+  assert.equal(isPublicTargetPath("/_next/static/chunk.js"), true);
+  assert.equal(isPublicTargetPath("/favicon.ico"), true);
+
+  assert.equal(isPublicTargetPath("/"), false);
+  assert.equal(isPublicTargetPath("/items?page=1"), false);
+  assert.equal(isPublicTargetPath("/external/items?page=1"), false);
+  assert.equal(isPublicTargetPath("/protected/items?page=1"), false);
+  assert.equal(isPublicTargetPath("/layout-changed/items"), false);
 });
 
 test("login submit redirects with the original request host", async () => {

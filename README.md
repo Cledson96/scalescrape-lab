@@ -69,8 +69,11 @@ Servicos:
 O target-site e uma vitrine local do simulador em Next.js 16 com App Router. O
 visual foi inspirado na linguagem de protecao ao credito, prevencao a fraudes,
 onboarding e monitoramento continuo usada pela Procob, sem copiar assets
-proprietarios. A home (`/`) mostra os cenarios disponiveis e as paginas de dados
-preservam os seletores usados pelo Playwright:
+proprietarios. O portal inteiro exige login fake com captcha local antes de
+mostrar qualquer pagina de dados; sem cookie `lab_auth=ok`, `/`, `/items`,
+`/external/items` e demais rotas redirecionam para `/login`. Depois do login, a
+home (`/`) mostra os cenarios disponiveis e as paginas de dados preservam os
+seletores usados pelo Playwright:
 
 - `/items?page=1`: dataset local sintetico, paginado e estavel
 - `/login?next=/protected/items?page=1`: login fake com captcha local
@@ -112,7 +115,7 @@ http://target-site:4000/layout-changed/items?page=1
 ## Captcha Local Com 2Captcha
 
 Por padrao, o projeto usa `MockCaptchaResolverProvider`. O target-site exige
-login em `/protected/items`; o worker detecta `#login-form`, preenche
+login antes de qualquer pagina do portal; o worker detecta `#login-form`, preenche
 `TARGET_SITE_USERNAME` e `TARGET_SITE_PASSWORD`, resolve `#captcha-image` e
 continua a raspagem dos `.item-card`.
 

@@ -94,15 +94,89 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
           extracted_at: "2026-05-18T21:39:14.229704"
         }
       ]}
+      fakeItems={{
+        items: [
+          {
+            id: 10,
+            job_id: 12,
+            external_id: "protected-1",
+            title: "Empresa Aurora",
+            detail_url: "http://target-site:4000/items/protected-1",
+            public_detail_url: "https://dev.scalescrape.cledson.com.br/items/protected-1",
+            raw_data: { source: "fake-target", category: "score alto" },
+            created_at: "2026-05-18T21:39:14.229704",
+            extracted_at: "2026-05-18T21:39:14.229704"
+          }
+        ],
+        total: 1,
+        page: 1,
+        page_size: 10,
+        total_pages: 1
+      }}
+      booksItems={{
+        items: [
+          {
+            id: 99,
+            job_id: 17,
+            external_id: "join_902",
+            title: "Join",
+            detail_url: "https://books.toscrape.com/catalogue/join_902/index.html",
+            public_detail_url: "https://books.toscrape.com/catalogue/join_902/index.html",
+            raw_data: {
+              source: "books-to-scrape",
+              price: { formatted: "£35.67", brl_formatted: "R$ 231,86" },
+              rating: { label: "Five", value: 5 },
+              description: "What if you could live multiple lives simultaneously?"
+            },
+            created_at: "2026-05-18T21:39:14.229704",
+            extracted_at: "2026-05-18T21:39:14.229704"
+          }
+        ],
+        total: 1,
+        page: 1,
+        page_size: 10,
+        total_pages: 1
+      }}
+      globoItems={{
+        items: [
+          {
+            id: 120,
+            job_id: 18,
+            external_id: "g1-globo-com-saude-remedio",
+            title: "Remedio recolhido",
+            detail_url: "https://g1.globo.com/saude/noticia/2026/05/18/remedio.ghtml",
+            public_detail_url: "https://g1.globo.com/saude/noticia/2026/05/18/remedio.ghtml",
+            public_image_url: "https://api-dev.scalescrape.cledson.com.br/media/globo/remedio.jpg",
+            raw_data: {
+              source: "globo-home",
+              category: "jornalismo",
+              description: "Resumo da noticia para o dashboard."
+            },
+            created_at: "2026-05-18T21:39:14.229704",
+            extracted_at: "2026-05-18T21:39:14.229704"
+          }
+        ],
+        total: 1,
+        page: 1,
+        page_size: 10,
+        total_pages: 1
+      }}
     />
   );
 
   assert.match(html, /Dados extraidos pelo ScaleScrape/);
-  assert.match(html, /Consultar target agora/);
+  assert.match(html, /Consultar fake agora/);
   assert.match(html, /Consultar Books agora/);
-  assert.match(html, /Consultar os dois agora/);
+  assert.match(html, /Consultar Globo agora/);
+  assert.match(html, /Consultar todos agora/);
+  assert.match(html, /Site fake protegido/);
+  assert.match(html, /Books to Scrape/);
+  assert.match(html, /Globo noticias/);
   assert.match(html, /https:\/\/dev\.scalescrape\.cledson\.com\.br\/protected\/items\?page=1/);
   assert.match(html, /Join/);
   assert.match(html, /£35.67 \/ R\$ 231,86/);
   assert.match(html, /Five \(5\/5\)/);
+  assert.match(html, /Remedio recolhido/);
+  assert.match(html, /Resumo da noticia para o dashboard/);
+  assert.match(html, /https:\/\/api-dev\.scalescrape\.cledson\.com\.br\/media\/globo\/remedio\.jpg/);
 });

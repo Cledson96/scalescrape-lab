@@ -6,14 +6,21 @@ import { fetchDashboardData } from "../../lib/dashboard-api";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams?: Promise<{ created?: string }>;
+  searchParams?: Promise<{ created?: string; fakePage?: string; booksPage?: string; globoPage?: string }>;
 };
 
+function pageNumber(value: string | undefined): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
 export default async function Page({ searchParams }: PageProps) {
-  const [data, params] = await Promise.all([
-    fetchDashboardData(),
-    searchParams ?? Promise.resolve(undefined)
-  ]);
+  const params = await (searchParams ?? Promise.resolve(undefined));
+  const data = await fetchDashboardData({
+    fakePage: pageNumber(params?.fakePage),
+    booksPage: pageNumber(params?.booksPage),
+    globoPage: pageNumber(params?.globoPage)
+  });
 
   return <DashboardPage {...data} createdJobs={params?.created} />;
 }

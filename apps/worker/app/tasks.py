@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -83,7 +84,7 @@ def run_scrape_job(self, job_id: int) -> dict:
                     "external_id": record.external_id,
                     "title": record.title,
                     "detail_url": record.detail_url,
-                    "raw_data": "{}",
+                    "raw_data": json.dumps(record.raw_data, ensure_ascii=False),
                 },
             )
         mark_job(session, job_id, "success", items_found=len(records))

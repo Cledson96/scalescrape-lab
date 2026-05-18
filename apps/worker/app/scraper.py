@@ -126,9 +126,9 @@ async def handle_login_if_present(
         source_host = host_from_url(start_url)
         page_url = page.url
         # 2Captcha API requires a valid public-looking domain/TLD to accept the task.
-        # We swap it to 'target-site.com'. The user MUST add 'target-site.com' to their
-        # reCAPTCHA allowed domains in Google Admin Console.
-        safe_page_url = page_url.replace("http://target-site:", "http://target-site.com:")
+        # We swap local docker hosts to the user's real public domain which is 
+        # registered in their Google reCAPTCHA allowed domains.
+        safe_page_url = page_url.replace("http://target-site:", "http://scalescrape.cledson.com.br:")
         
         start = monotonic()
         token = await asyncio.to_thread(provider.solve_recaptcha, sitekey, safe_page_url, source_host)

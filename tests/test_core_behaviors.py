@@ -246,7 +246,7 @@ class WorkerLoginFlowTests(unittest.TestCase):
 
         self.assertTrue(handled)
         self.assertEqual(provider.calls, [])
-        self.assertEqual(provider.recaptcha_calls, [("test-site-key", "http://target-site.com:4000/login", "target-site")])
+        self.assertEqual(provider.recaptcha_calls, [("test-site-key", "http://scalescrape.cledson.com.br:4000/login", "target-site")])
         self.assertEqual(page.locators["input[name='username']"].filled_value, "demo")
         self.assertEqual(page.locators["input[name='password']"].filled_value, "demo123")
         self.assertTrue(page.locators["#login-form button[type='submit']"].clicked)

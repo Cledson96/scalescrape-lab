@@ -28,6 +28,13 @@ const scenarios = [
     tone: "green"
   },
   {
+    title: "Dashboard de extracao",
+    href: "/dashboard",
+    description: "Tabela dos itens salvos no banco e botoes para executar os dois scrapings agora.",
+    tag: "Postgres",
+    tone: "blue"
+  },
+  {
     title: "Rate limit",
     href: "/rate-limited/items",
     description: "Resposta 429 para retry, backoff e cooldown de proxy.",
@@ -63,7 +70,7 @@ export function HomePage({ localTotal, externalTotal }: HomePageProps) {
           </p>
           <div className="hero-actions">
             <a className="primary-action" href="/items?page=1">Testar dataset</a>
-            <a className="secondary-action" href="/protected/items?page=1">Ver anti-bot</a>
+            <a className="secondary-action" href="/dashboard">Ver dashboard</a>
           </div>
         </div>
         <div className="status-board" aria-label="Resumo do laboratorio">

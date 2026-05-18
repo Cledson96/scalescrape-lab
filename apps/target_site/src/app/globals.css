@@ -461,6 +461,142 @@ a {
   cursor: pointer;
 }
 
+.dashboard-content {
+  display: grid;
+  gap: 22px;
+}
+
+.dashboard-hero {
+  background: #ffffff;
+}
+
+.dashboard-alert {
+  padding: 12px 14px;
+  border: 1px solid #efaaa3;
+  border-radius: 8px;
+  background: #fff1ef;
+  color: var(--red);
+  font-weight: 700;
+}
+
+.dashboard-alert.success {
+  border-color: #9fd4be;
+  background: #eefbf4;
+  color: var(--green);
+}
+
+.dashboard-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.dashboard-actions form {
+  margin: 0;
+}
+
+.dashboard-actions button,
+.secondary-dashboard-action {
+  min-height: 40px;
+  border: 0;
+  padding: 10px 13px;
+  background: var(--teal);
+  color: #06231f;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.secondary-dashboard-action {
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--navy);
+}
+
+.dashboard-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-metric {
+  min-height: 92px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.dashboard-metric strong {
+  display: block;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.dashboard-metric span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dashboard-section {
+  display: grid;
+  gap: 12px;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.dashboard-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.dashboard-table th {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  background: #f8fafc;
+}
+
+.dashboard-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.dashboard-table a {
+  color: var(--blue);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.extracted-table {
+  min-width: 1080px;
+}
+
+.table-subtle {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 @media (max-width: 760px) {
   .topbar {
     align-items: flex-start;

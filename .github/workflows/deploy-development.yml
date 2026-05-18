@@ -166,8 +166,8 @@ jobs:
             ENABLE_PROXY_ROTATION=true
             ALLOWED_PROXY_TARGET_HOSTS=target-site,localhost,127.0.0.1
             SCRAPER_MAX_ATTEMPTS=3
-            SCRAPER_PAGE_TIMEOUT_SECONDS=30
-            SCRAPER_JOB_TIMEOUT_SECONDS=180
+            SCRAPER_PAGE_TIMEOUT_SECONDS=120
+            SCRAPER_JOB_TIMEOUT_SECONDS=300
             ENV
             if ! docker compose --env-file .env.production -f compose.deploy.yml pull; then
               docker system prune -af || true
@@ -255,7 +255,7 @@ jobs:
               exit 1
             fi
             JOB_STATUS_JSON=""
-            for i in $(seq 1 60); do
+            for i in $(seq 1 90); do
               JOB_STATUS_JSON=$(curl -fsS --max-time 20 "http://127.0.0.1:${API_PORT}/jobs/${JOB_ID}" || true)
               if [ -z "${JOB_STATUS_JSON}" ]; then
                 echo "Waiting for smoke job response (${i}/60)"

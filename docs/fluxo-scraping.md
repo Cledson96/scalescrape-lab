@@ -153,6 +153,11 @@ GET /items
 GET /jobs/{job_id}/items
 ```
 
+Tambem ha uma vitrine visual em `/dashboard` no target-site. Ela consulta a API
+server-side por `SCALESCRAPE_API_URL`, mostra `public_url`/`public_detail_url`
+para trocar `http://target-site:4000` pelo dominio publico do ambiente, e possui
+botoes para criar jobs imediatos dos dois scrapers.
+
 O target-site tambem tem uma fonte dinamica propria: `/external/items` busca a
 API real RandomUser, normaliza os dados sem expor e-mail/telefone/documento, usa
 cache de 6 horas e fallback local se a API externa ficar indisponivel.

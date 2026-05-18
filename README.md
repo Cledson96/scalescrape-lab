@@ -139,6 +139,19 @@ GET /jobs/{job_id}/items
 Cada item retorna `extracted_at` e tambem grava esse horario em `raw_data` para
 facilitar a demonstracao do momento em que o dado foi coletado.
 
+Visualmente, a rota `/dashboard` do target-site mostra:
+
+- tabela de jobs recentes;
+- tabela de itens extraidos salvos no Postgres;
+- `public_url` para o dominio publico da demo;
+- botoes para consultar agora o target protegido, Books to Scrape ou os dois.
+
+Em dev, acesse:
+
+```text
+https://dev.scalescrape.cledson.com.br/dashboard
+```
+
 ## Agendamento A Cada 6 Horas
 
 O projeto inclui um servico `scheduler` com Celery Beat. Ele funciona como um
@@ -150,6 +163,8 @@ cron job e dispara automaticamente, a cada 6 horas, dois scrapings de demo:
 Configuracao:
 
 ```env
+PUBLIC_TARGET_SITE_URL=https://dev.scalescrape.cledson.com.br
+SCALESCRAPE_API_URL=http://api:8000
 ENABLE_SCHEDULED_SCRAPING=true
 SCHEDULED_SCRAPE_INTERVAL_SECONDS=21600
 SCHEDULED_PROTECTED_TARGET_URL=http://target-site:4000/protected/items?page=1

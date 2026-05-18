@@ -117,13 +117,14 @@ jobs:
           GRAFANA_PORT: ${{ secrets.DEVELOPMENT_GRAFANA_PORT }}
           POSTGRES_PASSWORD: ${{ secrets.DEVELOPMENT_POSTGRES_PASSWORD }}
           RABBITMQ_PASSWORD: ${{ secrets.DEVELOPMENT_RABBITMQ_PASSWORD }}
+          RABBITMQ_MANAGEMENT_PORT: ${{ secrets.DEVELOPMENT_RABBITMQ_MANAGEMENT_PORT }}
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.DEVELOPMENT_GRAFANA_ADMIN_PASSWORD }}
           TWO_CAPTCHA_API_KEY: ${{ secrets.TWO_CAPTCHA_API_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: API_IMAGE,WORKER_IMAGE,TARGET_SITE_IMAGE,COMPOSE_PROJECT_NAME,TARGET_SITE_PORT,API_PORT,GRAFANA_PORT,POSTGRES_PASSWORD,RABBITMQ_PASSWORD,GRAFANA_ADMIN_PASSWORD,TWO_CAPTCHA_API_KEY
+          envs: API_IMAGE,WORKER_IMAGE,TARGET_SITE_IMAGE,COMPOSE_PROJECT_NAME,TARGET_SITE_PORT,API_PORT,GRAFANA_PORT,POSTGRES_PASSWORD,RABBITMQ_PASSWORD,RABBITMQ_MANAGEMENT_PORT,GRAFANA_ADMIN_PASSWORD,TWO_CAPTCHA_API_KEY
           script: |
             set -euo pipefail
             cd "${{ secrets.DEVELOPMENT_VPS_APP_DIR }}"
@@ -133,6 +134,8 @@ jobs:
             if [ -z "${TARGET_SITE_PORT:-}" ]; then TARGET_SITE_PORT=4001; fi
             if [ -z "${API_PORT:-}" ]; then API_PORT=8001; fi
             if [ -z "${GRAFANA_PORT:-}" ]; then GRAFANA_PORT=3001; fi
+            if [ -z "${RABBITMQ_MANAGEMENT_PORT:-}" ]; then RABBITMQ_MANAGEMENT_PORT=11572; fi
+            RABBITMQ_MANAGEMENT_USER=scalescrape_viewer
             cat > .env.production <<ENV
             COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
             API_IMAGE=${API_IMAGE}
@@ -144,6 +147,8 @@ jobs:
             POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
             RABBITMQ_DEFAULT_USER=guest
             RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+            RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT}
+            RABBITMQ_MANAGEMENT_USER=${RABBITMQ_MANAGEMENT_USER}
             GRAFANA_ADMIN_USER=admin
             GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
             DATABASE_URL=postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@postgres:5432/scalescrape
@@ -168,6 +173,18 @@ jobs:
             docker compose --env-file .env.production -f compose.deploy.yml up -d --remove-orphans
             docker image prune -f
 
+            for i in $(seq 1 30); do
+              if docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmq-diagnostics -q ping; then
+                break
+              fi
+              echo "Waiting for rabbitmq cli (${i}/30)"
+              sleep 2
+            done
+            docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmqctl add_user "${RABBITMQ_MANAGEMENT_USER}" "${RABBITMQ_PASSWORD}" \
+              || docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmqctl change_password "${RABBITMQ_MANAGEMENT_USER}" "${RABBITMQ_PASSWORD}"
+            docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmqctl set_user_tags "${RABBITMQ_MANAGEMENT_USER}" monitoring
+            docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmqctl set_permissions -p / "${RABBITMQ_MANAGEMENT_USER}" "" "" ".*"
+
             dump_diagnostics() {
               docker compose --env-file .env.production -f compose.deploy.yml ps || true
               docker compose --env-file .env.production -f compose.deploy.yml logs --tail=160 target-site api worker grafana || true
@@ -190,9 +207,29 @@ jobs:
               return 1
             }
 
+            wait_for_basic_auth_url() {
+              name="$1"
+              url="$2"
+              user="$3"
+              password="$4"
+              attempts="${5:-60}"
+              for i in $(seq 1 "${attempts}"); do
+                if curl -fsS --max-time 15 -u "${user}:${password}" "${url}" >/dev/null; then
+                  echo "${name} ready"
+                  return 0
+                fi
+                echo "Waiting for ${name} (${i}/${attempts})"
+                sleep 2
+              done
+              echo "${name} did not become ready: ${url}"
+              dump_diagnostics
+              return 1
+            }
+
             wait_for_url target-site "http://127.0.0.1:${TARGET_SITE_PORT}/" 90
             wait_for_url api "http://127.0.0.1:${API_PORT}/health" 90
             wait_for_url grafana "http://127.0.0.1:${GRAFANA_PORT}/api/health" 90
+            wait_for_basic_auth_url rabbitmq-management "http://127.0.0.1:${RABBITMQ_MANAGEMENT_PORT}/api/overview" "${RABBITMQ_MANAGEMENT_USER}" "${RABBITMQ_PASSWORD}" 90
 
             JOB_RESPONSE=""
             for i in $(seq 1 20); do

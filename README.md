@@ -152,8 +152,15 @@ Subdominios planejados:
 
 - Dev: `dev.scalescrape.cledson.com.br`, `api-dev.scalescrape.cledson.com.br`, `grafana-dev.scalescrape.cledson.com.br`
 - Main: `scalescrape.cledson.com.br`, `api.scalescrape.cledson.com.br`, `grafana.scalescrape.cledson.com.br`
+- RabbitMQ Management opcional: `rabbit-dev.scalescrape.cledson.com.br` e `rabbit.scalescrape.cledson.com.br`
 
-RabbitMQ, Postgres e Prometheus ficam internos no Docker. Os Actions executam
+Postgres, AMQP do RabbitMQ e Prometheus ficam internos no Docker. O painel
+RabbitMQ Management pode ser publicado atras do Nginx, preso em `127.0.0.1` nas
+portas `11572` (dev) e `11573` (main). Os Actions criam o usuario
+`scalescrape_viewer` com tag `monitoring`; a senha e o mesmo valor de
+`DEVELOPMENT_RABBITMQ_PASSWORD` ou `PRODUCTION_RABBITMQ_PASSWORD`.
+
+Os Actions executam
 testes Python, `npm test`, `npm run typecheck`, `npm run build`, publicam as
 imagens, fazem SSH na VPS, atualizam `.env.production`, sobem a stack e rodam
 smoke de target, API, Grafana e scraping contra
@@ -180,6 +187,13 @@ DEVELOPMENT_RABBITMQ_PASSWORD
 PRODUCTION_RABBITMQ_PASSWORD
 DEVELOPMENT_GRAFANA_ADMIN_PASSWORD
 PRODUCTION_GRAFANA_ADMIN_PASSWORD
+```
+
+Secrets opcionais para trocar as portas padrao do RabbitMQ Management:
+
+```text
+DEVELOPMENT_RABBITMQ_MANAGEMENT_PORT
+PRODUCTION_RABBITMQ_MANAGEMENT_PORT
 ```
 
 ## Proxy Rotation Local

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from time import monotonic
 from urllib.parse import urljoin
+import asyncio
 
 from app.captcha.base import CaptchaResolverProvider
 from app.metrics import CAPTCHA_DETECTED, CAPTCHA_SOLVE_DURATION, CAPTCHA_SOLVED
@@ -125,7 +126,7 @@ async def handle_login_if_present(
         source_host = host_from_url(start_url)
         page_url = page.url
         start = monotonic()
-        token = provider.solve_recaptcha(sitekey, page_url, source_host)
+        token = await asyncio.to_thread(provider.solve_recaptcha, sitekey, page_url, source_host)
         CAPTCHA_SOLVE_DURATION.observe(monotonic() - start)
         CAPTCHA_SOLVED.inc()
 
@@ -155,7 +156,7 @@ async def handle_login_if_present(
         image_bytes = await image.screenshot(type="png")
         source_host = host_from_url(start_url)
         start = monotonic()
-        solution = provider.solve_image_captcha(image_bytes, source_host)
+        solution = await asyncio.to_thread(provider.solve_image_captcha, image_bytes, source_host)
         CAPTCHA_SOLVE_DURATION.observe(monotonic() - start)
         CAPTCHA_SOLVED.inc()
         await page.locator("input[name='captcha_answer']").fill(solution)

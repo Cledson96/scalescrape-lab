@@ -130,8 +130,8 @@ async def handle_login_if_present(
     await page.locator("input[name='username']").fill(credentials.username)
     await page.locator("input[name='password']").fill(credentials.password)
     await page.locator("input[name='captcha_answer']").fill(solution)
-    await page.locator("#login-form button[type='submit']").click()
-    await page.wait_for_load_state("domcontentloaded")
+    async with page.expect_navigation(wait_until="domcontentloaded"):
+        await page.locator("#login-form button[type='submit']").click()
     return True
 
 

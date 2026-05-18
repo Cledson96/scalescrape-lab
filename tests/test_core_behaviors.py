@@ -158,9 +158,22 @@ class FakeLoginPage:
             "#login-form button[type='submit']": FakeLocator(),
         }
         self.waited_for: list[str] = []
+        self.expected_navigation: str | None = None
 
     def locator(self, selector: str) -> FakeLocator:
         return self.locators[selector]
+
+    def expect_navigation(self, wait_until: str):
+        page = self
+
+        class ExpectedNavigation:
+            async def __aenter__(self):
+                page.expected_navigation = wait_until
+
+            async def __aexit__(self, exc_type, exc, tb):  # noqa: ANN001
+                return False
+
+        return ExpectedNavigation()
 
     async def wait_for_load_state(self, state: str) -> None:
         self.waited_for.append(state)
@@ -196,7 +209,8 @@ class WorkerLoginFlowTests(unittest.TestCase):
         self.assertEqual(page.locators["input[name='password']"].filled_value, "demo123")
         self.assertEqual(page.locators["input[name='captcha_answer']"].filled_value, "SOLVED")
         self.assertTrue(page.locators["#login-form button[type='submit']"].clicked)
-        self.assertEqual(page.waited_for, ["domcontentloaded"])
+        self.assertEqual(page.expected_navigation, "domcontentloaded")
+        self.assertEqual(page.waited_for, [])
 
 
 if __name__ == "__main__":

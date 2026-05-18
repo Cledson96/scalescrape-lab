@@ -8,7 +8,8 @@ import {
 } from "../src/lib/data";
 import { AntibotAction, AntibotSimulator } from "../src/lib/antibot";
 import { normalizeNextPath, validateLoginCredentials } from "../src/lib/auth";
-import { CaptchaStore } from "../src/lib/captcha";
+import { CaptchaStore, captchaStore } from "../src/lib/captcha";
+import { POST as submitLogin } from "../src/app/login/submit/route";
 
 test("local fake records are deterministic and large enough for scale demo", () => {
   const first = getLocalRecords({ prefix: "normal", total: 240 });
@@ -87,6 +88,15 @@ test("captcha store accepts the mock resolver answer used by the worker", () => 
   assert.equal(store.verify(challenge.challengeId, "abcde"), false);
 });
 
+test("captcha challenge can be rendered and verified across store instances", () => {
+  const firstStore = new CaptchaStore();
+  const secondStore = new CaptchaStore();
+  const challenge = firstStore.create();
+
+  assert.match(secondStore.renderSvg(challenge.challengeId), /ABCDE/);
+  assert.equal(secondStore.verify(challenge.challengeId, "abcde"), true);
+});
+
 test("login credentials use env values with safe demo defaults", () => {
   assert.equal(validateLoginCredentials("demo", "demo123", {}), true);
   assert.equal(validateLoginCredentials("demo", "wrong", {}), false);
@@ -104,4 +114,28 @@ test("login next path only allows local relative paths", () => {
   assert.equal(normalizeNextPath("https://example.com/phish"), "/protected/items?page=1");
   assert.equal(normalizeNextPath("//example.com/phish"), "/protected/items?page=1");
   assert.equal(normalizeNextPath("/login?next=/admin"), "/protected/items?page=1");
+});
+
+test("login submit redirects with the original request host", async () => {
+  const challenge = captchaStore.create();
+  const form = new URLSearchParams({
+    username: "demo",
+    password: "demo123",
+    challenge_id: challenge.challengeId,
+    captcha_answer: challenge.expectedAnswer,
+    next: "/protected/items?page=1"
+  });
+  const response = await submitLogin(
+    new Request("http://localhost:4000/login/submit", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        host: "target-site:4000"
+      },
+      body: form
+    })
+  );
+
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get("location"), "http://target-site:4000/protected/items?page=1");
 });

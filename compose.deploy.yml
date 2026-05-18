@@ -36,6 +36,8 @@ services:
     env_file: .env.production
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - scraped-media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +55,8 @@ services:
     env_file: .env.production
     expose:
       - "9100"
+    volumes:
+      - scraped-media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -115,3 +119,4 @@ volumes:
   rabbitmq-data:
   prometheus-data:
   grafana-data:
+  scraped-media:

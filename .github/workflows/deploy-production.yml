@@ -156,7 +156,9 @@ jobs:
             DATABASE_URL=postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@postgres:5432/scalescrape
             RABBITMQ_URL=amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672//
             PUBLIC_TARGET_SITE_URL=https://scalescrape.cledson.com.br
+            PUBLIC_API_URL=https://api.scalescrape.cledson.com.br
             SCALESCRAPE_API_URL=http://api:8000
+            MEDIA_ROOT=/app/media
             ENABLE_REAL_2CAPTCHA=true
             TWO_CAPTCHA_API_KEY=${TWO_CAPTCHA_API_KEY}
             RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY}
@@ -166,8 +168,9 @@ jobs:
             TARGET_SITE_USERNAME=demo
             TARGET_SITE_PASSWORD=demo123
             ENABLE_PROXY_ROTATION=true
-            ALLOWED_PROXY_TARGET_HOSTS=target-site,localhost,127.0.0.1,books.toscrape.com
+            ALLOWED_PROXY_TARGET_HOSTS=target-site,localhost,127.0.0.1,books.toscrape.com,www.globo.com
             GBP_TO_BRL_RATE=6.50
+            GLOBO_MAX_ARTICLES=12
             SCRAPER_MAX_ATTEMPTS=3
             SCRAPER_PAGE_TIMEOUT_SECONDS=120
             SCRAPER_JOB_TIMEOUT_SECONDS=300
@@ -175,6 +178,7 @@ jobs:
             SCHEDULED_SCRAPE_INTERVAL_SECONDS=21600
             SCHEDULED_PROTECTED_TARGET_URL=http://target-site:4000/protected/items?page=1
             SCHEDULED_BOOKS_TO_SCRAPE_URL=https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
+            SCHEDULED_GLOBO_HOME_URL=https://www.globo.com/
             ENV
             if ! docker compose --env-file .env.production -f compose.deploy.yml pull; then
               docker system prune -af || true

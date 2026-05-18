@@ -32,6 +32,8 @@ services:
     env_file: .env
     ports:
       - "8000:8000"
+    volumes:
+      - scraped-media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,6 +46,8 @@ services:
     env_file: .env
     ports:
       - "9100:9100"
+    volumes:
+      - scraped-media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,3 +97,4 @@ services:
 
 volumes:
   postgres-data:
+  scraped-media:

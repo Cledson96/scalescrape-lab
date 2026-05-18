@@ -62,6 +62,7 @@ test("login page renders form and reCAPTCHA widget used by the worker", () => {
 test("dashboard renders extracted items table and immediate scrape actions", () => {
   const html = renderToStaticMarkup(
     <DashboardPage
+      activeTab="betano"
       jobs={[
         {
           id: 12,
@@ -161,6 +162,39 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
         page_size: 10,
         total_pages: 1
       }}
+      betanoItems={{
+        items: [
+          {
+            id: 220,
+            job_id: 31,
+            external_id: "betano-ponte-preta-vs-londrina",
+            title: "Ponte Preta vs Londrina-PR",
+            detail_url: "https://www.betano.bet.br/odds/ponte-preta-londrina",
+            public_detail_url: "https://www.betano.bet.br/odds/ponte-preta-londrina",
+            raw_data: {
+              source: "betano-football",
+              championship: "Brasil - Brasileirao - Serie B",
+              home_team: "Ponte Preta",
+              away_team: "Londrina-PR",
+              match_date: "18/05",
+              match_time: "45:00",
+              market_type: "Resultado da partida",
+              odds: {
+                home_raw: "6.30",
+                draw_raw: "3.25",
+                away_raw: "1.65"
+              },
+              extracted_at: "2026-05-18T22:51:06.755533"
+            },
+            created_at: "2026-05-18T22:51:06.755533",
+            extracted_at: "2026-05-18T22:51:06.755533"
+          }
+        ],
+        total: 1,
+        page: 2,
+        page_size: 10,
+        total_pages: 3
+      }}
     />
   );
 
@@ -168,15 +202,27 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
   assert.match(html, /Consultar fake agora/);
   assert.match(html, /Consultar Books agora/);
   assert.match(html, /Consultar Globo agora/);
+  assert.match(html, /Consultar Betano agora/);
   assert.match(html, /Consultar todos agora/);
-  assert.match(html, /Site fake protegido/);
-  assert.match(html, /Books to Scrape/);
-  assert.match(html, /Globo noticias/);
+  assert.match(html, /href="\/dashboard\?tab=fake&amp;betanoPage=2"/);
+  assert.match(html, /href="\/dashboard\?tab=books&amp;betanoPage=2"/);
+  assert.match(html, /href="\/dashboard\?tab=globo&amp;betanoPage=2"/);
+  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=2"/);
+  assert.match(html, /class="[^"]*dashboard-tab[^"]*active[^"]*"/);
+  assert.doesNotMatch(html, /Registros coletados apos login/);
+  assert.match(html, /Site fake/);
+  assert.match(html, /Books/);
+  assert.match(html, /Globo/);
+  assert.match(html, /Betano futebol/);
   assert.match(html, /https:\/\/dev\.scalescrape\.cledson\.com\.br\/protected\/items\?page=1/);
-  assert.match(html, /Join/);
-  assert.match(html, /£35.67 \/ R\$ 231,86/);
-  assert.match(html, /Five \(5\/5\)/);
-  assert.match(html, /Remedio recolhido/);
-  assert.match(html, /Resumo da noticia para o dashboard/);
-  assert.match(html, /https:\/\/api-dev\.scalescrape\.cledson\.com\.br\/media\/globo\/remedio\.jpg/);
+  assert.doesNotMatch(html, /£35.67 \/ R\$ 231,86/);
+  assert.doesNotMatch(html, /Resumo da noticia para o dashboard/);
+  assert.match(html, /Brasil - Brasileirao - Serie B/);
+  assert.match(html, /Ponte Preta x Londrina-PR/);
+  assert.match(html, /Resultado da partida/);
+  assert.match(html, /6.30/);
+  assert.match(html, /3.25/);
+  assert.match(html, /1.65/);
+  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=1"/);
+  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=3"/);
 });

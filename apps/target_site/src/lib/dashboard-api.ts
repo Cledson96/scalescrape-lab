@@ -38,6 +38,7 @@ export type DashboardData = {
   fakeItems: PaginatedItems;
   booksItems: PaginatedItems;
   globoItems: PaginatedItems;
+  betanoItems: PaginatedItems;
   apiError?: string;
 };
 
@@ -57,6 +58,12 @@ export const dashboardJobPayloads = {
   "globo-home": {
     source: "globo-home",
     start_url: "https://www.globo.com/",
+    mode: "browser",
+    max_pages: 1
+  },
+  "betano-football": {
+    source: "betano-football",
+    start_url: "https://www.betano.bet.br/sport/futebol/",
     mode: "browser",
     max_pages: 1
   }
@@ -85,22 +92,24 @@ function sourcePageUrl(apiBaseUrl: string, source: keyof typeof dashboardJobPayl
   return `${apiBaseUrl}/items/page?${params.toString()}`;
 }
 
-export async function fetchDashboardData(pages: { fakePage?: number; booksPage?: number; globoPage?: number } = {}): Promise<DashboardData> {
+export async function fetchDashboardData(pages: { fakePage?: number; booksPage?: number; globoPage?: number; betanoPage?: number } = {}): Promise<DashboardData> {
   const apiBaseUrl = getApiBaseUrl();
   const fakePage = pages.fakePage ?? 1;
   const booksPage = pages.booksPage ?? 1;
   const globoPage = pages.globoPage ?? 1;
+  const betanoPage = pages.betanoPage ?? 1;
   try {
-    const [jobsResponse, itemsResponse, fakeResponse, booksResponse, globoResponse] = await Promise.all([
+    const [jobsResponse, itemsResponse, fakeResponse, booksResponse, globoResponse, betanoResponse] = await Promise.all([
       fetch(`${apiBaseUrl}/jobs`, { cache: "no-store" }),
       fetch(`${apiBaseUrl}/items?limit=80`, { cache: "no-store" }),
       fetch(sourcePageUrl(apiBaseUrl, "fake-target", fakePage), { cache: "no-store" }),
       fetch(sourcePageUrl(apiBaseUrl, "books-to-scrape", booksPage), { cache: "no-store" }),
-      fetch(sourcePageUrl(apiBaseUrl, "globo-home", globoPage), { cache: "no-store" })
+      fetch(sourcePageUrl(apiBaseUrl, "globo-home", globoPage), { cache: "no-store" }),
+      fetch(sourcePageUrl(apiBaseUrl, "betano-football", betanoPage), { cache: "no-store" })
     ]);
 
-    if (!jobsResponse.ok || !itemsResponse.ok || !fakeResponse.ok || !booksResponse.ok || !globoResponse.ok) {
-      throw new Error(`API retornou ${jobsResponse.status}/${itemsResponse.status}/${fakeResponse.status}/${booksResponse.status}/${globoResponse.status}`);
+    if (!jobsResponse.ok || !itemsResponse.ok || !fakeResponse.ok || !booksResponse.ok || !globoResponse.ok || !betanoResponse.ok) {
+      throw new Error(`API retornou ${jobsResponse.status}/${itemsResponse.status}/${fakeResponse.status}/${booksResponse.status}/${globoResponse.status}/${betanoResponse.status}`);
     }
 
     return {
@@ -108,7 +117,8 @@ export async function fetchDashboardData(pages: { fakePage?: number; booksPage?:
       items: (await itemsResponse.json()) as ExtractedItem[],
       fakeItems: (await fakeResponse.json()) as PaginatedItems,
       booksItems: (await booksResponse.json()) as PaginatedItems,
-      globoItems: (await globoResponse.json()) as PaginatedItems
+      globoItems: (await globoResponse.json()) as PaginatedItems,
+      betanoItems: (await betanoResponse.json()) as PaginatedItems
     };
   } catch (error) {
     return {
@@ -117,6 +127,7 @@ export async function fetchDashboardData(pages: { fakePage?: number; booksPage?:
       fakeItems: emptyPage(fakePage),
       booksItems: emptyPage(booksPage),
       globoItems: emptyPage(globoPage),
+      betanoItems: emptyPage(betanoPage),
       apiError: error instanceof Error ? error.message : "Falha ao consultar a API"
     };
   }
@@ -124,7 +135,12 @@ export async function fetchDashboardData(pages: { fakePage?: number; booksPage?:
 
 export function payloadsForSource(source: DashboardJobSource): Array<(typeof dashboardJobPayloads)[keyof typeof dashboardJobPayloads]> {
   if (source === "all") {
-    return [dashboardJobPayloads["fake-target"], dashboardJobPayloads["books-to-scrape"], dashboardJobPayloads["globo-home"]];
+    return [
+      dashboardJobPayloads["fake-target"],
+      dashboardJobPayloads["books-to-scrape"],
+      dashboardJobPayloads["globo-home"],
+      dashboardJobPayloads["betano-football"]
+    ];
   }
   return [dashboardJobPayloads[source]];
 }

@@ -3,7 +3,13 @@ import { redirect } from "next/navigation";
 import { createDashboardJobs, type DashboardJobSource } from "../../../lib/dashboard-api";
 
 function normalizeSource(value: FormDataEntryValue | null): DashboardJobSource {
-  if (value === "fake-target" || value === "books-to-scrape" || value === "globo-home" || value === "all") {
+  if (
+    value === "fake-target"
+    || value === "books-to-scrape"
+    || value === "globo-home"
+    || value === "betano-football"
+    || value === "all"
+  ) {
     return value;
   }
   return "all";

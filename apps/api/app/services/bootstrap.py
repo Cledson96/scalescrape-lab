@@ -11,6 +11,7 @@ def seed_defaults(session: Session) -> None:
         settings.default_source_name: settings.default_source_url,
         "books-to-scrape": "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
         "globo-home": "https://www.globo.com/",
+        "betano-football": "https://www.betano.bet.br/sport/futebol/",
     }
     for name, base_url in sources.items():
         source = session.scalar(select(Source).where(Source.name == name))

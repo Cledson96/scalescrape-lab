@@ -322,13 +322,17 @@ class ScheduledScrapeTests(unittest.TestCase):
     def test_scheduled_scrape_jobs_runs_all_demo_sources_every_six_hours(self) -> None:
         jobs = scheduled_scrape_jobs(interval_seconds=21600)
 
-        self.assertEqual([job["source"] for job in jobs], ["fake-target", "books-to-scrape", "globo-home"])
+        self.assertEqual(
+            [job["source"] for job in jobs],
+            ["fake-target", "books-to-scrape", "globo-home", "betano-football"],
+        )
         self.assertEqual(jobs[0]["start_url"], "http://target-site:4000/protected/items?page=1")
         self.assertEqual(
             jobs[1]["start_url"],
             "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
         )
         self.assertEqual(jobs[2]["start_url"], "https://www.globo.com/")
+        self.assertEqual(jobs[3]["start_url"], "https://www.betano.bet.br/sport/futebol/")
         self.assertTrue(all(job["mode"] == "browser" for job in jobs))
         self.assertTrue(all(job["interval_seconds"] == 21600 for job in jobs))
 

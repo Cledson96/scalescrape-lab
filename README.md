@@ -106,7 +106,31 @@ No Swagger (`/docs`), execute `POST /jobs`:
 }
 ```
 
-Outros cenarios:
+Para o scraping externo seguro, use a fonte publica Books to Scrape na categoria
+Science Fiction:
+
+```json
+{
+  "source": "books-to-scrape",
+  "start_url": "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
+  "mode": "browser",
+  "max_pages": 1
+}
+```
+
+Esse fluxo extrai titulo, preco original em GBP, preco convertido para BRL,
+nota, link de detalhe e descricao do livro. A conversao usa a taxa configuravel
+`GBP_TO_BRL_RATE`, que por padrao fica em `6.50` para manter a demo
+deterministica.
+
+Depois que o job terminar, veja os registros extraidos em:
+
+```text
+GET /items
+GET /jobs/{job_id}/items
+```
+
+Outros cenarios do target controlado:
 
 ```text
 http://target-site:4000/items?page=1
@@ -160,6 +184,10 @@ proprio projeto ou ambientes explicitamente autorizados.
    `.detail-link`.
 7. Os itens sao gravados em `scraped_items`; o job passa para `success`,
    `failed`, `blocked`, `rate_limited` ou `blocked_by_policy`.
+
+Para Books to Scrape, o worker usa o layout `article.product_pod`, abre cada
+pagina de detalhe do livro, le `#product_description + p` e grava os campos
+normalizados em `raw_data`.
 
 ## Deploy Na VPS
 

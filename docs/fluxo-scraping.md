@@ -37,6 +37,18 @@ A API FastAPI recebe `POST /jobs` com uma URL inicial:
 Ela valida a fonte, cria um registro em `jobs`, grava um evento `job_created` e
 publica a tarefa `app.tasks.run_scrape_job` na fila `scrape.jobs`.
 
+Para demonstrar um segundo scraping externo seguro, use a fonte
+`books-to-scrape`:
+
+```json
+{
+  "source": "books-to-scrape",
+  "start_url": "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
+  "mode": "browser",
+  "max_pages": 1
+}
+```
+
 ## 2. Fila E Worker
 
 O RabbitMQ segura o trabalho ate o Celery worker consumir a mensagem. O worker:
@@ -101,6 +113,14 @@ extrai:
 
 Se houver `.next-page`, o worker segue a paginacao ate `max_pages`.
 
+No Books to Scrape, o worker usa outro adaptador:
+
+- lista os livros em `article.product_pod`;
+- captura titulo, preco em GBP, nota e link;
+- abre a pagina de detalhe do livro;
+- extrai a descricao em `#product_description + p`;
+- grava tambem o preco convertido para BRL usando `GBP_TO_BRL_RATE`.
+
 ## 6. Persistencia E Status
 
 Ao final, os dados vao para `scraped_items`. O job recebe um destes status:
@@ -113,6 +133,13 @@ Ao final, os dados vao para `scraped_items`. O job recebe um destes status:
 
 Eventos importantes ficam em `job_events`, o que ajuda a explicar a historia do
 job durante a demo.
+
+Os dados coletados podem ser vistos pela API:
+
+```text
+GET /items
+GET /jobs/{job_id}/items
+```
 
 ## 7. Observabilidade
 

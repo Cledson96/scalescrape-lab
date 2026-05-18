@@ -33,6 +33,7 @@ export function ItemsPage({ title, subtitle, page, route, detailRoute }: ItemsPa
                 <span>{record.category}</span>
                 <span>{record.region}</span>
                 <span>score de risco: {record.riskScore}</span>
+                {record.fetchedAt ? <span>extraido em: {new Date(record.fetchedAt).toLocaleString("pt-BR")}</span> : null}
               </div>
               <div className="risk" aria-hidden="true">
                 <span style={{ width: `${Math.max(4, Math.min(100, record.riskScore))}%` }} />

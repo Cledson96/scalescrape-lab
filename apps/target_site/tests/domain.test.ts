@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  EXTERNAL_CACHE_TTL_MS,
   getLocalRecords,
+  isExternalCacheFresh,
   normalizeRandomUserPayload,
   paginateRecords
 } from "../src/lib/data";
@@ -36,6 +38,7 @@ test("pagination returns the expected slice and navigation state", () => {
 });
 
 test("randomuser payload is normalized without sensitive contact fields", () => {
+  const fetchedAt = "2026-05-18T12:00:00.000Z";
   const records = normalizeRandomUserPayload({
     results: [
       {
@@ -49,16 +52,25 @@ test("randomuser payload is normalized without sensitive contact fields", () => 
           timezone: { description: "Brasilia" }
         },
         email: "fake@example.test",
-        phone: "000"
+        phone: "telefone-sensivel"
       }
     ]
-  });
+  }, "external", fetchedAt);
 
   assert.equal(records.length, 1);
   assert.equal(records[0]?.externalId, "external-1");
   assert.match(records[0]?.title ?? "", /Brazil/);
+  assert.equal(records[0]?.fetchedAt, fetchedAt);
+  assert.match(records[0]?.rawSummary ?? "", /importado_em=2026-05-18T12:00:00.000Z/);
   assert.doesNotMatch(records[0]?.rawSummary ?? "", /fake@example\.test/);
-  assert.doesNotMatch(records[0]?.rawSummary ?? "", /000/);
+  assert.doesNotMatch(records[0]?.rawSummary ?? "", /telefone-sensivel/);
+});
+
+test("external cache is fresh for six hours and expires after that", () => {
+  const fetchedAt = new Date(Date.UTC(2026, 4, 18, 12, 0, 0));
+
+  assert.equal(isExternalCacheFresh(fetchedAt, new Date(fetchedAt.getTime() + EXTERNAL_CACHE_TTL_MS - 1)), true);
+  assert.equal(isExternalCacheFresh(fetchedAt, new Date(fetchedAt.getTime() + EXTERNAL_CACHE_TTL_MS)), false);
 });
 
 test("antibot simulator challenges suspicious high-volume sessions", () => {

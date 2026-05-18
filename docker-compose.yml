@@ -52,6 +52,15 @@ services:
       target-site:
         condition: service_started
 
+  scheduler:
+    build:
+      context: ./apps/worker
+    env_file: .env
+    command: ["celery", "-A", "app.celery_app:celery_app", "beat", "--loglevel=INFO"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   target-site:
     build:
       context: ./apps/target_site

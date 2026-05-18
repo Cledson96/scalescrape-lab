@@ -7,6 +7,7 @@ export type PublicRecord = {
   riskScore: number;
   sourceLabel: string;
   rawSummary: string;
+  fetchedAt?: string;
 };
 
 export type RecordPage = {
@@ -59,6 +60,16 @@ const statuses = ["ativo", "em analise", "atualizado", "monitorado"];
 
 const localCache = new Map<string, PublicRecord[]>();
 let externalCache: PublicRecord[] | null = null;
+let externalCacheFetchedAt: Date | null = null;
+
+export const EXTERNAL_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+export function isExternalCacheFresh(fetchedAt: Date | null, now = new Date()): boolean {
+  if (!fetchedAt) {
+    return false;
+  }
+  return now.getTime() - fetchedAt.getTime() < EXTERNAL_CACHE_TTL_MS;
+}
 
 export function getLocalRecords({ prefix = "normal", total = 240 }: { prefix?: string; total?: number } = {}): PublicRecord[] {
   const safeTotal = Math.max(1, total);
@@ -109,7 +120,11 @@ export function paginateRecords(records: PublicRecord[], pageNumber: number, per
   };
 }
 
-export function normalizeRandomUserPayload(payload: RandomUserPayload, prefix = "external"): PublicRecord[] {
+export function normalizeRandomUserPayload(
+  payload: RandomUserPayload,
+  prefix = "external",
+  fetchedAt = new Date().toISOString()
+): PublicRecord[] {
   return (payload.results ?? []).map((item, offset) => {
     const index = offset + 1;
     const location = item.location ?? {};
@@ -129,13 +144,14 @@ export function normalizeRandomUserPayload(payload: RandomUserPayload, prefix = 
       status: "importado",
       riskScore: 20 + ((index * 11) % 70),
       sourceLabel: "RandomUser fake API",
-      rawSummary: `fonte=randomuser; idade_aproximada=${age}; genero=${gender}; fuso=${timezone}`
+      rawSummary: `fonte=randomuser; importado_em=${fetchedAt}; idade_aproximada=${age}; genero=${gender}; fuso=${timezone}`,
+      fetchedAt
     };
   });
 }
 
 export async function getExternalRecords(size = 500): Promise<PublicRecord[]> {
-  if (externalCache) {
+  if (externalCache && isExternalCacheFresh(externalCacheFetchedAt)) {
     return [...externalCache];
   }
 
@@ -148,14 +164,17 @@ export async function getExternalRecords(size = 500): Promise<PublicRecord[]> {
   });
 
   try {
+    const fetchedAt = new Date();
     const response = await fetch(`https://randomuser.me/api/?${params.toString()}`, {
-      next: { revalidate: 3600 }
+      next: { revalidate: EXTERNAL_CACHE_TTL_MS / 1000 }
     });
     if (!response.ok) {
       throw new Error(`RandomUser returned ${response.status}`);
     }
-    externalCache = normalizeRandomUserPayload((await response.json()) as RandomUserPayload);
+    externalCacheFetchedAt = fetchedAt;
+    externalCache = normalizeRandomUserPayload((await response.json()) as RandomUserPayload, "external", fetchedAt.toISOString());
   } catch {
+    externalCacheFetchedAt = new Date();
     externalCache = getLocalRecords({ prefix: "external-fallback", total: safeSize });
   }
 

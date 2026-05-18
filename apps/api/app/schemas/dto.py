@@ -32,6 +32,7 @@ class ScrapedItemRead(BaseModel):
     detail_url: str
     raw_data: dict
     created_at: datetime
+    extracted_at: datetime
 
     model_config = {"from_attributes": True}
 

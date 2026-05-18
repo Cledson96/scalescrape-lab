@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import importlib.util
 from pathlib import Path
 import sys
@@ -56,6 +57,7 @@ from app.books import (  # noqa: E402
     parse_books_price,
     parse_rating_class,
 )
+from app.schedule import scheduled_scrape_jobs  # noqa: E402
 from app.scraper import LoginCredentials, handle_login_if_present  # noqa: E402
 
 PolicyError = worker_policy.PolicyError
@@ -308,6 +310,20 @@ class BooksToScrapeParserTests(unittest.TestCase):
         self.assertEqual(payload["availability"], "In stock")
 
 
+class ScheduledScrapeTests(unittest.TestCase):
+    def test_scheduled_scrape_jobs_runs_fake_and_books_sources_every_six_hours(self) -> None:
+        jobs = scheduled_scrape_jobs(interval_seconds=21600)
+
+        self.assertEqual([job["source"] for job in jobs], ["fake-target", "books-to-scrape"])
+        self.assertEqual(jobs[0]["start_url"], "http://target-site:4000/protected/items?page=1")
+        self.assertEqual(
+            jobs[1]["start_url"],
+            "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
+        )
+        self.assertTrue(all(job["mode"] == "browser" for job in jobs))
+        self.assertTrue(all(job["interval_seconds"] == 21600 for job in jobs))
+
+
 class ApiItemsSchemaTests(unittest.TestCase):
     def test_scraped_item_read_exposes_raw_extracted_data(self) -> None:
         item = ScrapedItemRead.model_validate(
@@ -322,12 +338,33 @@ class ApiItemsSchemaTests(unittest.TestCase):
                     "description": "Set in the far future.",
                 },
                 "created_at": "2026-05-18T12:00:00",
+                "extracted_at": "2026-05-18T12:00:00",
             }
         )
 
         self.assertEqual(item.title, "Dune (Dune #1)")
+        self.assertEqual(item.extracted_at.isoformat(), "2026-05-18T12:00:00")
         self.assertEqual(item.raw_data["price"]["brl_amount"], 356.59)
         self.assertEqual(item.raw_data["description"], "Set in the far future.")
+
+    def test_scraped_item_read_can_alias_created_at_as_extracted_at(self) -> None:
+        class FakeScrapedItem:
+            id = 11
+            job_id = 3
+            external_id = "join_902"
+            title = "Join"
+            detail_url = "https://books.toscrape.com/catalogue/join_902/index.html"
+            raw_data = {"source": "books-to-scrape"}
+            created_at = datetime(2026, 5, 18, 13, 30, 0)
+
+            @property
+            def extracted_at(self):
+                return self.created_at
+
+        item = ScrapedItemRead.model_validate(FakeScrapedItem())
+
+        self.assertEqual(item.created_at.isoformat(), "2026-05-18T13:30:00")
+        self.assertEqual(item.extracted_at.isoformat(), "2026-05-18T13:30:00")
 
 
 if __name__ == "__main__":

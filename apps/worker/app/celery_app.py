@@ -10,4 +10,13 @@ celery_app.conf.task_default_queue = "scrape.jobs"
 celery_app.conf.imports = ("app.tasks",)
 celery_app.conf.task_routes = {
     "app.tasks.run_scrape_job": {"queue": "scrape.jobs"},
+    "app.tasks.enqueue_scheduled_scrape_jobs": {"queue": "scrape.jobs"},
 }
+celery_app.conf.timezone = "UTC"
+celery_app.conf.beat_schedule = {}
+
+if settings.enable_scheduled_scraping:
+    celery_app.conf.beat_schedule["scheduled-demo-scrapes-every-six-hours"] = {
+        "task": "app.tasks.enqueue_scheduled_scrape_jobs",
+        "schedule": settings.scheduled_scrape_interval_seconds,
+    }

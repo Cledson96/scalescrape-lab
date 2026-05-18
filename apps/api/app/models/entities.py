@@ -58,6 +58,10 @@ class ScrapedItem(Base):
 
     job: Mapped[Job] = relationship(back_populates="items")
 
+    @property
+    def extracted_at(self) -> datetime:
+        return self.created_at
+
 
 class JobEvent(Base):
     __tablename__ = "job_events"

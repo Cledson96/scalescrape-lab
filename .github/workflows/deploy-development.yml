@@ -169,6 +169,10 @@ jobs:
             SCRAPER_MAX_ATTEMPTS=3
             SCRAPER_PAGE_TIMEOUT_SECONDS=120
             SCRAPER_JOB_TIMEOUT_SECONDS=300
+            ENABLE_SCHEDULED_SCRAPING=true
+            SCHEDULED_SCRAPE_INTERVAL_SECONDS=21600
+            SCHEDULED_PROTECTED_TARGET_URL=http://target-site:4000/protected/items?page=1
+            SCHEDULED_BOOKS_TO_SCRAPE_URL=https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
             ENV
             if ! docker compose --env-file .env.production -f compose.deploy.yml pull; then
               docker system prune -af || true
@@ -192,7 +196,7 @@ jobs:
 
             dump_diagnostics() {
               docker compose --env-file .env.production -f compose.deploy.yml ps || true
-              docker compose --env-file .env.production -f compose.deploy.yml logs --tail=160 target-site api worker grafana || true
+              docker compose --env-file .env.production -f compose.deploy.yml logs --tail=160 target-site api worker scheduler grafana || true
             }
 
             wait_for_url() {

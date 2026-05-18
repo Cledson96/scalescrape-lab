@@ -61,6 +61,15 @@ services:
       target-site:
         condition: service_started
 
+  scheduler:
+    image: ${WORKER_IMAGE:-ghcr.io/cledson96/scalescrape-lab-worker:latest}
+    restart: unless-stopped
+    env_file: .env.production
+    command: ["celery", "-A", "app.celery_app:celery_app", "beat", "--loglevel=INFO"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   target-site:
     image: ${TARGET_SITE_IMAGE:-ghcr.io/cledson96/scalescrape-lab-target-site:latest}
     restart: unless-stopped

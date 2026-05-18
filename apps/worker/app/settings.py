@@ -25,6 +25,16 @@ class Settings:
     scraper_page_timeout_seconds: int = int(os.getenv("SCRAPER_PAGE_TIMEOUT_SECONDS", "30"))
     scraper_job_timeout_seconds: int = int(os.getenv("SCRAPER_JOB_TIMEOUT_SECONDS", "180"))
     gbp_to_brl_rate: float = float(os.getenv("GBP_TO_BRL_RATE", "6.50"))
+    enable_scheduled_scraping: bool = os.getenv("ENABLE_SCHEDULED_SCRAPING", "true").lower() == "true"
+    scheduled_scrape_interval_seconds: int = int(os.getenv("SCHEDULED_SCRAPE_INTERVAL_SECONDS", "21600"))
+    scheduled_protected_target_url: str = os.getenv(
+        "SCHEDULED_PROTECTED_TARGET_URL",
+        "http://target-site:4000/protected/items?page=1",
+    )
+    scheduled_books_to_scrape_url: str = os.getenv(
+        "SCHEDULED_BOOKS_TO_SCRAPE_URL",
+        "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(

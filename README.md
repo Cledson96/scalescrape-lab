@@ -73,7 +73,8 @@ proprietarios. A home (`/`) mostra os cenarios disponiveis e as paginas de dados
 preservam os seletores usados pelo Playwright:
 
 - `/items?page=1`: dataset local sintetico, paginado e estavel
-- `/protected/items?page=1`: dataset sob anti-bot local, com session, risco e challenge
+- `/login?next=/protected/items?page=1`: login fake com captcha local
+- `/protected/items?page=1`: dataset sob login, anti-bot local, session, risco e challenge
 - `/external/items?page=1`: massa fake externa via RandomUser, com fallback local
 - `/rate-limited/items`: resposta `429` para testar retry e cooldown
 - `/forbidden/items`: resposta `403` para testar bloqueio
@@ -110,7 +111,17 @@ http://target-site:4000/layout-changed/items?page=1
 
 ## Captcha Local Com 2Captcha
 
-Por padrao, o projeto usa `MockCaptchaResolverProvider`.
+Por padrao, o projeto usa `MockCaptchaResolverProvider`. O target-site exige
+login em `/protected/items`; o worker detecta `#login-form`, preenche
+`TARGET_SITE_USERNAME` e `TARGET_SITE_PASSWORD`, resolve `#captcha-image` e
+continua a raspagem dos `.item-card`.
+
+Credenciais demo:
+
+```env
+TARGET_SITE_USERNAME=demo
+TARGET_SITE_PASSWORD=demo123
+```
 
 Para demonstrar 2Captcha real no captcha proprio/local:
 
@@ -123,6 +134,53 @@ MAX_CAPTCHA_SOLVES_PER_RUN=20
 
 O provider valida o host antes de chamar a API externa. Se o host nao estiver na
 whitelist, o job e bloqueado por policy.
+
+## Deploy Na VPS
+
+O deploy usa `compose.deploy.yml` com imagens GHCR:
+
+- `ghcr.io/cledson96/scalescrape-lab-api`
+- `ghcr.io/cledson96/scalescrape-lab-worker`
+- `ghcr.io/cledson96/scalescrape-lab-target-site`
+
+Workflows:
+
+- `.github/workflows/deploy-development.yml`: branch `development`, tags `development` e `development-${sha}`
+- `.github/workflows/deploy-production.yml`: branch `main`, tags `latest` e `${sha}`
+
+Subdominios planejados:
+
+- Dev: `dev.scalescrape.cledson.com.br`, `api-dev.scalescrape.cledson.com.br`, `grafana-dev.scalescrape.cledson.com.br`
+- Main: `scalescrape.cledson.com.br`, `api.scalescrape.cledson.com.br`, `grafana.scalescrape.cledson.com.br`
+
+RabbitMQ, Postgres e Prometheus ficam internos no Docker. Os Actions executam
+testes Python, `npm test`, `npm run typecheck`, `npm run build`, publicam as
+imagens, fazem SSH na VPS, atualizam `.env.production`, sobem a stack e rodam
+smoke de target, API, Grafana e scraping contra
+`http://target-site:4000/protected/items?page=1`.
+
+Secrets esperados no GitHub:
+
+```text
+VPS_HOST
+VPS_USER
+VPS_SSH_KEY
+DEVELOPMENT_VPS_APP_DIR
+PRODUCTION_VPS_APP_DIR
+TWO_CAPTCHA_API_KEY
+DEVELOPMENT_TARGET_SITE_PORT
+DEVELOPMENT_API_PORT
+DEVELOPMENT_GRAFANA_PORT
+PRODUCTION_TARGET_SITE_PORT
+PRODUCTION_API_PORT
+PRODUCTION_GRAFANA_PORT
+DEVELOPMENT_POSTGRES_PASSWORD
+PRODUCTION_POSTGRES_PASSWORD
+DEVELOPMENT_RABBITMQ_PASSWORD
+PRODUCTION_RABBITMQ_PASSWORD
+DEVELOPMENT_GRAFANA_ADMIN_PASSWORD
+PRODUCTION_GRAFANA_ADMIN_PASSWORD
+```
 
 ## Proxy Rotation Local
 

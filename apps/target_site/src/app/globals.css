@@ -367,6 +367,96 @@ a {
   margin-top: 0;
 }
 
+.login-panel {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  gap: 24px;
+  align-items: start;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: clamp(22px, 4vw, 36px);
+}
+
+.login-panel .eyebrow {
+  border-color: #b7d7ed;
+  background: #eef7fc;
+  color: var(--blue);
+}
+
+.login-panel h1 {
+  margin: 0 0 10px;
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.08;
+}
+
+.login-panel p {
+  color: var(--muted);
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.login-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.login-form input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.captcha-box {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #b7d7ed;
+  background: #f3f9fc;
+  padding: 14px;
+}
+
+.captcha-box div {
+  display: grid;
+  gap: 2px;
+}
+
+.captcha-box span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.captcha-box img {
+  width: 180px;
+  height: 70px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--red);
+  font-weight: 700;
+}
+
+.login-form button {
+  width: fit-content;
+  border: 0;
+  background: var(--teal);
+  color: #06231f;
+  padding: 11px 14px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 @media (max-width: 760px) {
   .topbar {
     align-items: flex-start;
@@ -383,5 +473,9 @@ a {
 
   .status-board {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .login-panel {
+    grid-template-columns: 1fr;
   }
 }

@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { HomePage } from "../src/components/home-page";
 import { ItemsPage } from "../src/components/items-page";
+import { LoginPage } from "../src/components/login-page";
 import { Shell } from "../src/components/shell";
 import { getLocalRecords, paginateRecords } from "../src/lib/data";
 
@@ -40,4 +41,19 @@ test("items page preserves scraper selectors", () => {
   assert.match(html, /class="detail-link/);
   assert.match(html, /class="next-page/);
   assert.match(html, /data-item-id="normal-1"/);
+});
+
+test("login page renders form and captcha selectors used by the worker", () => {
+  const html = renderToStaticMarkup(
+    <LoginPage challengeId="challenge-1" nextPath="/protected/items?page=1" />
+  );
+
+  assert.match(html, /id="login-form"/);
+  assert.match(html, /name="username"/);
+  assert.match(html, /name="password"/);
+  assert.match(html, /name="captcha_answer"/);
+  assert.match(html, /name="challenge_id"/);
+  assert.match(html, /id="captcha-challenge"/);
+  assert.match(html, /data-challenge-id="challenge-1"/);
+  assert.match(html, /id="captcha-image"/);
 });

@@ -7,6 +7,7 @@ import {
   paginateRecords
 } from "../src/lib/data";
 import { AntibotAction, AntibotSimulator } from "../src/lib/antibot";
+import { normalizeNextPath, validateLoginCredentials } from "../src/lib/auth";
 import { CaptchaStore } from "../src/lib/captcha";
 
 test("local fake records are deterministic and large enough for scale demo", () => {
@@ -84,4 +85,23 @@ test("captcha store accepts the mock resolver answer used by the worker", () => 
   assert.equal(challenge.expectedAnswer, "ABCDE");
   assert.equal(store.verify(challenge.challengeId, "abcde"), true);
   assert.equal(store.verify(challenge.challengeId, "abcde"), false);
+});
+
+test("login credentials use env values with safe demo defaults", () => {
+  assert.equal(validateLoginCredentials("demo", "demo123", {}), true);
+  assert.equal(validateLoginCredentials("demo", "wrong", {}), false);
+  assert.equal(
+    validateLoginCredentials("cledson", "secret", {
+      TARGET_SITE_USERNAME: "cledson",
+      TARGET_SITE_PASSWORD: "secret"
+    }),
+    true
+  );
+});
+
+test("login next path only allows local relative paths", () => {
+  assert.equal(normalizeNextPath("/protected/items?page=1"), "/protected/items?page=1");
+  assert.equal(normalizeNextPath("https://example.com/phish"), "/protected/items?page=1");
+  assert.equal(normalizeNextPath("//example.com/phish"), "/protected/items?page=1");
+  assert.equal(normalizeNextPath("/login?next=/admin"), "/protected/items?page=1");
 });

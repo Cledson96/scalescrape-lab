@@ -130,11 +130,17 @@ class FakeLocator:
         self.filled_value: str | None = None
         self.clicked = False
 
+    @property
+    def first(self) -> "FakeLocator":
+        return self
+
     async def count(self) -> int:
         return self._count
 
     async def get_attribute(self, name: str) -> str | None:
-        return self._attr if name == "data-challenge-id" else None
+        if name in ("data-challenge-id", "data-sitekey"):
+            return self._attr
+        return None
 
     async def screenshot(self, type: str) -> bytes:  # noqa: A002
         return self._screenshot
@@ -150,6 +156,7 @@ class FakeLoginPage:
     def __init__(self) -> None:
         self.locators = {
             "#login-form": FakeLocator(),
+            ".g-recaptcha": FakeLocator(count=0),
             "#captcha-challenge": FakeLocator(attr="challenge-1"),
             "#captcha-image": FakeLocator(screenshot=b"captcha-bytes"),
             "input[name='username']": FakeLocator(),
@@ -157,11 +164,16 @@ class FakeLoginPage:
             "input[name='captcha_answer']": FakeLocator(),
             "#login-form button[type='submit']": FakeLocator(),
         }
+        self.url = "http://target-site:4000/login"
         self.waited_for: list[str] = []
         self.expected_navigation: str | None = None
+        self.evaluated: list[tuple[str, str]] = []
 
     def locator(self, selector: str) -> FakeLocator:
-        return self.locators[selector]
+        return self.locators.get(selector, FakeLocator(count=0))
+
+    async def evaluate(self, script: str, arg: str) -> None:
+        self.evaluated.append((script, arg))
 
     def expect_navigation(self, wait_until: str):
         page = self
@@ -183,14 +195,19 @@ class RecordingCaptchaProvider:
     def __init__(self, answer: str = "ABCDE") -> None:
         self.answer = answer
         self.calls: list[tuple[bytes, str]] = []
+        self.recaptcha_calls: list[tuple[str, str, str]] = []
 
     def solve_image_captcha(self, image_bytes: bytes, source_host: str) -> str:
         self.calls.append((image_bytes, source_host))
         return self.answer
 
+    def solve_recaptcha(self, sitekey: str, page_url: str, source_host: str) -> str:
+        self.recaptcha_calls.append((sitekey, page_url, source_host))
+        return self.answer
+
 
 class WorkerLoginFlowTests(unittest.TestCase):
-    def test_login_handler_solves_captcha_and_submits_credentials(self) -> None:
+    def test_login_handler_solves_local_captcha_and_submits_credentials(self) -> None:
         page = FakeLoginPage()
         provider = RecordingCaptchaProvider(answer="SOLVED")
 
@@ -205,12 +222,36 @@ class WorkerLoginFlowTests(unittest.TestCase):
 
         self.assertTrue(handled)
         self.assertEqual(provider.calls, [(b"captcha-bytes", "target-site")])
+        self.assertEqual(provider.recaptcha_calls, [])
         self.assertEqual(page.locators["input[name='username']"].filled_value, "demo")
         self.assertEqual(page.locators["input[name='password']"].filled_value, "demo123")
         self.assertEqual(page.locators["input[name='captcha_answer']"].filled_value, "SOLVED")
         self.assertTrue(page.locators["#login-form button[type='submit']"].clicked)
         self.assertEqual(page.expected_navigation, "domcontentloaded")
         self.assertEqual(page.waited_for, [])
+
+    def test_login_handler_solves_recaptcha_and_submits_credentials(self) -> None:
+        page = FakeLoginPage()
+        page.locators[".g-recaptcha"] = FakeLocator(count=1, attr="test-site-key")
+        provider = RecordingCaptchaProvider(answer="TOKEN123")
+
+        handled = asyncio.run(
+            handle_login_if_present(
+                page,
+                "http://target-site:4000/protected/items?page=1",
+                provider,
+                LoginCredentials(username="demo", password="demo123"),
+            )
+        )
+
+        self.assertTrue(handled)
+        self.assertEqual(provider.calls, [])
+        self.assertEqual(provider.recaptcha_calls, [("test-site-key", "http://target-site:4000/login", "target-site")])
+        self.assertEqual(page.locators["input[name='username']"].filled_value, "demo")
+        self.assertEqual(page.locators["input[name='password']"].filled_value, "demo123")
+        self.assertTrue(page.locators["#login-form button[type='submit']"].clicked)
+        self.assertEqual(len(page.evaluated), 1)
+        self.assertEqual(page.evaluated[0][1], "TOKEN123")
 
 
 if __name__ == "__main__":

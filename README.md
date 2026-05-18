@@ -126,6 +126,11 @@ TARGET_SITE_USERNAME=demo
 TARGET_SITE_PASSWORD=demo123
 ```
 
+No deploy da VPS, o captcha do login gera uma resposta aleatoria por desafio e
+o worker precisa resolver a imagem via 2Captcha real. Para rodar localmente sem
+gastar creditos, o `docker-compose.yml` define
+`TARGET_SITE_FIXED_CAPTCHA_ANSWER=ABCDE` apenas no target-site local.
+
 Para demonstrar 2Captcha real no captcha proprio/local:
 
 ```env

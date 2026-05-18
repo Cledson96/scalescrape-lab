@@ -55,6 +55,8 @@ services:
   target-site:
     build:
       context: ./apps/target_site
+    environment:
+      TARGET_SITE_FIXED_CAPTCHA_ANSWER: ABCDE
     ports:
       - "4000:4000"
 

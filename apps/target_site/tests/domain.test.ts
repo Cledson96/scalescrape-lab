@@ -79,13 +79,32 @@ test("antibot simulator challenges suspicious high-volume sessions", () => {
   assert.equal(action, AntibotAction.Challenge);
 });
 
-test("captcha store accepts the mock resolver answer used by the worker", () => {
+test("captcha store creates non-fixed answers by default", () => {
   const store = new CaptchaStore();
   const challenge = store.create();
 
-  assert.equal(challenge.expectedAnswer, "ABCDE");
-  assert.equal(store.verify(challenge.challengeId, "abcde"), true);
-  assert.equal(store.verify(challenge.challengeId, "abcde"), false);
+  assert.match(challenge.expectedAnswer, /^[2-9HJKLMNPQRSTUVWXYZ]{5}$/);
+  assert.notEqual(challenge.expectedAnswer, "ABCDE");
+  assert.equal(store.verify(challenge.challengeId, challenge.expectedAnswer.toLowerCase()), true);
+  assert.equal(store.verify(challenge.challengeId, challenge.expectedAnswer), false);
+});
+
+test("captcha store can use fixed answer for local mock runs", () => {
+  const previous = process.env.TARGET_SITE_FIXED_CAPTCHA_ANSWER;
+  process.env.TARGET_SITE_FIXED_CAPTCHA_ANSWER = "ABCDE";
+  try {
+    const store = new CaptchaStore();
+    const challenge = store.create();
+
+    assert.equal(challenge.expectedAnswer, "ABCDE");
+    assert.equal(store.verify(challenge.challengeId, "abcde"), true);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.TARGET_SITE_FIXED_CAPTCHA_ANSWER;
+    } else {
+      process.env.TARGET_SITE_FIXED_CAPTCHA_ANSWER = previous;
+    }
+  }
 });
 
 test("captcha challenge can be rendered and verified across store instances", () => {
@@ -93,8 +112,11 @@ test("captcha challenge can be rendered and verified across store instances", ()
   const secondStore = new CaptchaStore();
   const challenge = firstStore.create();
 
-  assert.match(secondStore.renderSvg(challenge.challengeId), /ABCDE/);
-  assert.equal(secondStore.verify(challenge.challengeId, "abcde"), true);
+  const svg = secondStore.renderSvg(challenge.challengeId);
+  for (const letter of challenge.expectedAnswer) {
+    assert.match(svg, new RegExp(`>${letter}<`));
+  }
+  assert.equal(secondStore.verify(challenge.challengeId, challenge.expectedAnswer.toLowerCase()), true);
 });
 
 test("login credentials use env values with safe demo defaults", () => {

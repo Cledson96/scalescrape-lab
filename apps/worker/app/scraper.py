@@ -6,6 +6,11 @@ from time import monotonic
 from urllib.parse import urljoin
 import asyncio
 
+from app.betano import (
+    build_betano_record_payload,
+    extract_betano_external_id,
+    parse_betano_match_datetime,
+)
 from app.books import (
     build_books_record_payload,
     extract_book_external_id,
@@ -25,6 +30,7 @@ from app.policy import host_from_url
 from app.proxy.manager import ProxyProfileState
 
 
+BETANO_HOST = "www.betano.bet.br"
 BOOKS_TO_SCRAPE_HOST = "books.toscrape.com"
 GLOBO_HOME_HOST = "www.globo.com"
 
@@ -60,8 +66,10 @@ async def scrape_with_playwright(
     gbp_to_brl_rate: float = 6.5,
     media_root: str = "/app/media",
     globo_max_articles: int = 12,
+    betano_max_leagues: int = 10,
 ) -> list[ScrapedRecord]:
     from playwright.async_api import async_playwright
+
 
     records: list[ScrapedRecord] = []
     async with async_playwright() as playwright:
@@ -72,6 +80,16 @@ async def scrape_with_playwright(
         )
         page = await context.new_page()
         page.set_default_timeout(page_timeout_seconds * 1000)
+        if host_from_url(start_url) == BETANO_HOST:
+            records = await scrape_betano_football(
+                page=page,
+                start_url=start_url,
+                proxy=proxy,
+                max_leagues=betano_max_leagues,
+            )
+            await browser.close()
+            return records
+
         if host_from_url(start_url) == BOOKS_TO_SCRAPE_HOST:
             records = await scrape_books_to_scrape(
                 page=page,
@@ -335,6 +353,261 @@ async def download_globo_image(*, page, image_url: str, external_id: str, media_
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(await response.body())
     return image_path, image_public_path
+
+
+async def scrape_betano_football(
+    *,
+    page,
+    start_url: str,
+    proxy: ProxyProfileState,
+    max_leagues: int = 10,
+) -> list[ScrapedRecord]:
+    """Scrape football odds from Betano's POPULARES section.
+
+    Navigates to the football page, iterates through each popular league tab,
+    and collects match data with 1/X/2 odds for each visible game.
+    """
+    import re
+    from datetime import datetime, timezone
+
+    football_url = start_url
+    if not football_url.rstrip("/").endswith("/sport/futebol"):
+        football_url = start_url.rstrip("/") + "/sport/futebol/"
+
+    response = await page.goto(football_url, wait_until="networkidle")
+    status = response.status if response else 0
+    if status in (403, 429):
+        raise ScrapeBlocked(status, f"bloqueio HTTP {status} no Betano")
+
+    # Wait for the POPULARES section to render
+    await page.wait_for_timeout(4000)
+
+    records: list[ScrapedRecord] = []
+
+    # Find league tabs - they are clickable elements with league names
+    # near the POPULARES heading. Betano uses div/span/a elements as tabs.
+    league_keywords = [
+        "brasileir", "premier", "libertadores", "serie",
+        "copa", "league", "bundesliga", "liga", "ligue",
+        "championship", "sul-american", "feminino", "nbb",
+        "la liga", "serie a", "eredivisie", "championship",
+    ]
+
+    # Strategy: find all clickable elements and filter by league-name keywords
+    all_clickables = page.locator(
+        'div[role="button"], button, a[role="tab"], '
+        '[class*="league"] div, [class*="pill"], [class*="chip"], [class*="tab-item"]'
+    )
+    clickable_count = await all_clickables.count()
+    league_tabs = []
+    for i in range(clickable_count):
+        el = all_clickables.nth(i)
+        try:
+            text = (await el.inner_text(timeout=2000)).strip()
+            if text and any(kw in text.lower() for kw in league_keywords):
+                # Avoid duplicates and non-tab elements (like full match cards)
+                if len(text) < 60:
+                    league_tabs.append((el, text))
+        except Exception:
+            continue
+
+    # Deduplicate by text (keep first occurrence)
+    seen_names: set[str] = set()
+    unique_tabs = []
+    for el, name in league_tabs:
+        if name not in seen_names:
+            seen_names.add(name)
+            unique_tabs.append((el, name))
+    league_tabs = unique_tabs
+
+    leagues_to_scrape = min(len(league_tabs), max_leagues)
+    if leagues_to_scrape == 0:
+        raise RuntimeError("Nenhuma aba de liga encontrada na seção POPULARES do Betano")
+
+    for tab_el, championship in league_tabs[:leagues_to_scrape]:
+        extracted_at = datetime.now(timezone.utc).isoformat()
+
+        try:
+            await tab_el.click()
+            await page.wait_for_timeout(2500)
+
+            market_type = "Resultado da partida"
+
+            # Extract matches using the odds buttons as anchors.
+            # Betano odds buttons have aria-label like "Bet on 1 with odds 4.75."
+            # They appear as div[role="button"] or button elements.
+            odds_btns = page.locator(
+                '[aria-label*="Bet on"][aria-label*="odds"], '
+                '[aria-label*="apostar"][aria-label*="odds"], '
+                'div.selections__selection[role="button"]'
+            )
+            odds_count = await odds_btns.count()
+
+            if odds_count < 3:
+                # Fallback: try generic odds pattern via text
+                odds_btns = page.locator('[role="button"]')
+                fallback_odds = []
+                fc = await odds_btns.count()
+                for fi in range(fc):
+                    try:
+                        ft = (await odds_btns.nth(fi).inner_text(timeout=1000)).strip()
+                        if re.match(r'^\d+\.\d{2}$', ft):
+                            fallback_odds.append(odds_btns.nth(fi))
+                    except Exception:
+                        continue
+                if len(fallback_odds) >= 3:
+                    # Process in groups of 3
+                    for gi in range(0, len(fallback_odds) - 2, 3):
+                        try:
+                            record = await _build_match_from_odds_group(
+                                page=page,
+                                btn_home=fallback_odds[gi],
+                                btn_draw=fallback_odds[gi + 1],
+                                btn_away=fallback_odds[gi + 2],
+                                championship=championship,
+                                market_type=market_type,
+                                proxy=proxy,
+                                extracted_at=extracted_at,
+                            )
+                            if record:
+                                records.append(record)
+                        except Exception:
+                            continue
+                continue
+
+            # Group odds in sets of 3 (1/X/2)
+            for gi in range(0, odds_count - 2, 3):
+                try:
+                    record = await _build_match_from_odds_group(
+                        page=page,
+                        btn_home=odds_btns.nth(gi),
+                        btn_draw=odds_btns.nth(gi + 1),
+                        btn_away=odds_btns.nth(gi + 2),
+                        championship=championship,
+                        market_type=market_type,
+                        proxy=proxy,
+                        extracted_at=extracted_at,
+                    )
+                    if record:
+                        records.append(record)
+                except Exception:
+                    continue
+
+        except Exception:
+            continue
+
+    return records
+
+
+async def _build_match_from_odds_group(
+    *,
+    page,
+    btn_home,
+    btn_draw,
+    btn_away,
+    championship: str,
+    market_type: str,
+    proxy: ProxyProfileState,
+    extracted_at: str,
+) -> ScrapedRecord | None:
+    """Build a ScrapedRecord from a group of 3 odds buttons (1/X/2).
+
+    Navigates up the DOM from the first button to find team names,
+    date/time, and match URL in the parent event container.
+    """
+    import re
+
+    odd_home = (await btn_home.inner_text()).strip()
+    odd_draw = (await btn_draw.inner_text()).strip()
+    odd_away = (await btn_away.inner_text()).strip()
+
+    # Navigate up to find the event container with team names
+    # Try multiple ancestor strategies
+    parent = None
+    for xpath in [
+        "xpath=ancestor::div[contains(@class,'event') or contains(@class,'match') or contains(@class,'row')][1]",
+        "xpath=ancestor::div[.//a[contains(@href,'/odds/')]][1]",
+        "xpath=ancestor::div[count(.//div[@role='button'])>=3][1]",
+    ]:
+        candidate = btn_home.locator(xpath)
+        if await candidate.count() > 0:
+            parent = candidate.first
+            break
+
+    if not parent:
+        return None
+
+    parent_text = await parent.inner_text()
+    lines = [l.strip() for l in parent_text.split("\n") if l.strip()]
+
+    home_team = ""
+    away_team = ""
+    match_datetime_raw = ""
+    match_url = ""
+
+    # Try to find match URL from an <a> in the parent
+    match_link = parent.locator("a[href*='/odds/']")
+    if await match_link.count() > 0:
+        match_url = await match_link.first.get_attribute("href") or ""
+
+    # Parse lines for date/time and team names
+    team_candidates = []
+    for line in lines:
+        if re.match(r'^\d+\.\d{2}$', line):
+            continue
+        if line in ("1", "X", "2"):
+            continue
+        if "AO VIVO" in line.upper():
+            match_datetime_raw = "AO VIVO"
+            continue
+        if re.match(r'^\d{2}/\d{2}\s+\d{2}:\d{2}', line):
+            match_datetime_raw = line
+            continue
+        if line.lower() in ("hoje", "amanhã", "amanha"):
+            match_datetime_raw = line
+            continue
+        if any(kw in line.lower() for kw in [
+            "resultado", "mais/menos", "ambos", "chance",
+            "escanteios", "intervalo", "visitar", "populares",
+            "empate", "dupla",
+        ]):
+            continue
+        if len(line) > 1 and not re.match(r'^[\d.,]+$', line):
+            team_candidates.append(line)
+
+    if len(team_candidates) >= 2:
+        home_team = team_candidates[0]
+        away_team = team_candidates[1]
+    elif len(team_candidates) == 1:
+        home_team = team_candidates[0]
+
+    if not home_team:
+        return None
+
+    match_datetime = parse_betano_match_datetime(match_datetime_raw)
+    external_id = extract_betano_external_id(
+        home_team, away_team, championship, match_datetime_raw
+    )
+    payload = build_betano_record_payload(
+        home_team=home_team,
+        away_team=away_team,
+        championship=championship,
+        market_type=market_type,
+        odd_home=odd_home,
+        odd_draw=odd_draw,
+        odd_away=odd_away,
+        match_datetime=match_datetime,
+        match_url=match_url,
+        extracted_at=extracted_at,
+    )
+    title = f"{home_team} vs {away_team}"
+    return ScrapedRecord(
+        external_id=external_id,
+        title=title,
+        detail_url=match_url,
+        raw_data={**payload, "proxy": proxy.name},
+    )
+
 
 
 async def handle_login_if_present(

@@ -38,6 +38,11 @@ class Settings:
         "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
     )
     scheduled_globo_home_url: str = os.getenv("SCHEDULED_GLOBO_HOME_URL", "https://www.globo.com/")
+    scheduled_betano_football_url: str = os.getenv(
+        "SCHEDULED_BETANO_FOOTBALL_URL",
+        "https://www.betano.bet.br/sport/futebol/",
+    )
+    betano_max_leagues: int = int(os.getenv("BETANO_MAX_LEAGUES", "10"))
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -49,7 +54,7 @@ class Settings:
             self,
             "allowed_proxy_target_hosts",
             csv_env("ALLOWED_PROXY_TARGET_HOSTS", "target-site,localhost,127.0.0.1")
-            | {"books.toscrape.com", "www.globo.com"},
+            | {"books.toscrape.com", "www.globo.com", "www.betano.bet.br"},
         )
 
 

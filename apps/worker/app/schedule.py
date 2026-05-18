@@ -5,6 +5,7 @@ DEFAULT_SCHEDULED_SCRAPE_INTERVAL_SECONDS = 6 * 60 * 60
 DEFAULT_PROTECTED_TARGET_URL = "http://target-site:4000/protected/items?page=1"
 DEFAULT_BOOKS_TO_SCRAPE_URL = "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html"
 DEFAULT_GLOBO_HOME_URL = "https://www.globo.com/"
+DEFAULT_BETANO_FOOTBALL_URL = "https://www.betano.bet.br/sport/futebol/"
 
 
 def scheduled_scrape_jobs(
@@ -13,6 +14,7 @@ def scheduled_scrape_jobs(
     protected_target_url: str = DEFAULT_PROTECTED_TARGET_URL,
     books_to_scrape_url: str = DEFAULT_BOOKS_TO_SCRAPE_URL,
     globo_home_url: str = DEFAULT_GLOBO_HOME_URL,
+    betano_football_url: str = DEFAULT_BETANO_FOOTBALL_URL,
 ) -> list[dict]:
     return [
         {
@@ -32,6 +34,13 @@ def scheduled_scrape_jobs(
         {
             "source": "globo-home",
             "start_url": globo_home_url,
+            "mode": "browser",
+            "max_pages": 1,
+            "interval_seconds": interval_seconds,
+        },
+        {
+            "source": "betano-football",
+            "start_url": betano_football_url,
             "mode": "browser",
             "max_pages": 1,
             "interval_seconds": interval_seconds,

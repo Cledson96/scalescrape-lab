@@ -50,6 +50,7 @@ def enqueue_scheduled_scrape_jobs() -> dict:
         protected_target_url=settings.scheduled_protected_target_url,
         books_to_scrape_url=settings.scheduled_books_to_scrape_url,
         globo_home_url=settings.scheduled_globo_home_url,
+        betano_football_url=settings.scheduled_betano_football_url,
     )
     created_jobs: list[dict] = []
     try:
@@ -99,6 +100,7 @@ def run_scrape_job(self, job_id: int) -> dict:
                 gbp_to_brl_rate=settings.gbp_to_brl_rate,
                 media_root=settings.media_root,
                 globo_max_articles=settings.globo_max_articles,
+                betano_max_leagues=settings.betano_max_leagues,
             )
         )
         for record in records:

@@ -43,6 +43,7 @@ def load_module(name: str, path: Path):
 
 worker_policy = load_module("worker_policy", ROOT / "apps" / "worker" / "app" / "policy.py")
 worker_proxy = load_module("worker_proxy", ROOT / "apps" / "worker" / "app" / "proxy" / "manager.py")
+api_dto = load_module("api_dto", ROOT / "apps" / "api" / "app" / "schemas" / "dto.py")
 sys.path.insert(0, str(ROOT / "apps" / "worker"))
 from app.policy import PolicyError as AppPolicyError  # noqa: E402
 from app.captcha.two_captcha_provider import (  # noqa: E402
@@ -61,6 +62,7 @@ PolicyError = worker_policy.PolicyError
 ensure_host_allowed = worker_policy.ensure_host_allowed
 ProxyManager = worker_proxy.ProxyManager
 ProxyProfileState = worker_proxy.ProxyProfileState
+ScrapedItemRead = api_dto.ScrapedItemRead
 
 
 class PolicyTests(unittest.TestCase):
@@ -304,6 +306,28 @@ class BooksToScrapeParserTests(unittest.TestCase):
         self.assertEqual(payload["rating"], {"label": "One", "value": 1})
         self.assertEqual(payload["description"], "Set in the far future.")
         self.assertEqual(payload["availability"], "In stock")
+
+
+class ApiItemsSchemaTests(unittest.TestCase):
+    def test_scraped_item_read_exposes_raw_extracted_data(self) -> None:
+        item = ScrapedItemRead.model_validate(
+            {
+                "id": 10,
+                "job_id": 2,
+                "external_id": "dune-dune-1_151",
+                "title": "Dune (Dune #1)",
+                "detail_url": "https://books.toscrape.com/catalogue/dune-dune-1_151/index.html",
+                "raw_data": {
+                    "price": {"amount": 54.86, "brl_amount": 356.59},
+                    "description": "Set in the far future.",
+                },
+                "created_at": "2026-05-18T12:00:00",
+            }
+        )
+
+        self.assertEqual(item.title, "Dune (Dune #1)")
+        self.assertEqual(item.raw_data["price"]["brl_amount"], 356.59)
+        self.assertEqual(item.raw_data["description"], "Set in the far future.")
 
 
 if __name__ == "__main__":

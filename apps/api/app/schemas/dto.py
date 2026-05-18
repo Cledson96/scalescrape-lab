@@ -24,6 +24,18 @@ class JobRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ScrapedItemRead(BaseModel):
+    id: int
+    job_id: int
+    external_id: str
+    title: str
+    detail_url: str
+    raw_data: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class SourceRead(BaseModel):
     id: int
     name: str

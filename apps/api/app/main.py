@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.database import Base, engine, get_session
 from app.metrics import SCRAPE_JOBS_TOTAL, prometheus_response
-from app.models import AntibotEvent, Job, JobEvent, ProxyProfile, Source
-from app.schemas import JobCreate, JobRead, ProxyRead, SourceRead
+from app.models import AntibotEvent, Job, JobEvent, ProxyProfile, ScrapedItem, Source
+from app.schemas import JobCreate, JobRead, ProxyRead, ScrapedItemRead, SourceRead
 from app.services.bootstrap import seed_defaults
 from app.services.queue import enqueue_scrape_job
 
@@ -76,6 +76,37 @@ def get_job(job_id: int, session: Session = Depends(get_session)) -> Job:
     if job is None:
         raise HTTPException(status_code=404, detail="job_not_found")
     return job
+
+
+@app.get("/items", response_model=list[ScrapedItemRead])
+def list_items(
+    job_id: int | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    session: Session = Depends(get_session),
+) -> list[ScrapedItem]:
+    query = select(ScrapedItem)
+    if job_id is not None:
+        query = query.where(ScrapedItem.job_id == job_id)
+    query = query.order_by(desc(ScrapedItem.created_at)).limit(limit)
+    return list(session.scalars(query))
+
+
+@app.get("/jobs/{job_id}/items", response_model=list[ScrapedItemRead])
+def list_job_items(
+    job_id: int,
+    limit: int = Query(default=100, ge=1, le=500),
+    session: Session = Depends(get_session),
+) -> list[ScrapedItem]:
+    job = session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="job_not_found")
+    query = (
+        select(ScrapedItem)
+        .where(ScrapedItem.job_id == job_id)
+        .order_by(desc(ScrapedItem.created_at))
+        .limit(limit)
+    )
+    return list(session.scalars(query))
 
 
 @app.post("/jobs/{job_id}/retry", response_model=JobRead)

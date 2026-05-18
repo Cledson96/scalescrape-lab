@@ -49,6 +49,12 @@ from app.captcha.two_captcha_provider import (  # noqa: E402
     TwoCaptchaConfig,
     TwoCaptchaImageResolverProvider,
 )
+from app.books import (  # noqa: E402
+    build_books_record_payload,
+    extract_book_external_id,
+    parse_books_price,
+    parse_rating_class,
+)
 from app.scraper import LoginCredentials, handle_login_if_present  # noqa: E402
 
 PolicyError = worker_policy.PolicyError
@@ -252,6 +258,52 @@ class WorkerLoginFlowTests(unittest.TestCase):
         self.assertTrue(page.locators["#login-form button[type='submit']"].clicked)
         self.assertEqual(len(page.evaluated), 1)
         self.assertEqual(page.evaluated[0][1], "TOKEN123")
+
+
+class BooksToScrapeParserTests(unittest.TestCase):
+    def test_parse_books_price_converts_gbp_to_brl_with_configured_rate(self) -> None:
+        price = parse_books_price("£37.59", gbp_to_brl_rate=6.5)
+
+        self.assertEqual(price["currency"], "GBP")
+        self.assertEqual(price["amount"], 37.59)
+        self.assertEqual(price["formatted"], "£37.59")
+        self.assertEqual(price["brl_currency"], "BRL")
+        self.assertEqual(price["brl_amount"], 244.34)
+        self.assertEqual(price["brl_formatted"], "R$ 244,34")
+        self.assertEqual(price["exchange_rate"], 6.5)
+
+    def test_parse_rating_class_reads_books_to_scrape_rating_label_and_value(self) -> None:
+        rating = parse_rating_class("star-rating Three")
+
+        self.assertEqual(rating, {"label": "Three", "value": 3})
+
+    def test_extract_book_external_id_uses_detail_slug(self) -> None:
+        external_id = extract_book_external_id(
+            "https://books.toscrape.com/catalogue/dune-dune-1_151/index.html"
+        )
+
+        self.assertEqual(external_id, "dune-dune-1_151")
+
+    def test_build_books_record_payload_keeps_required_demo_fields(self) -> None:
+        payload = build_books_record_payload(
+            title="Dune (Dune #1)",
+            category="science-fiction",
+            detail_url="https://books.toscrape.com/catalogue/dune-dune-1_151/index.html",
+            price_text="£54.86",
+            rating_class="star-rating One",
+            description="Set in the far future.",
+            availability="In stock",
+            gbp_to_brl_rate=6.5,
+        )
+
+        self.assertEqual(payload["source"], "books-to-scrape")
+        self.assertEqual(payload["category"], "science-fiction")
+        self.assertEqual(payload["title"], "Dune (Dune #1)")
+        self.assertEqual(payload["price"]["amount"], 54.86)
+        self.assertEqual(payload["price"]["brl_amount"], 356.59)
+        self.assertEqual(payload["rating"], {"label": "One", "value": 1})
+        self.assertEqual(payload["description"], "Set in the far future.")
+        self.assertEqual(payload["availability"], "In stock")
 
 
 if __name__ == "__main__":

@@ -1,16 +1,22 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Query
-from sqlalchemy import desc, select
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.database import Base, engine, get_session
 from app.metrics import SCRAPE_JOBS_TOTAL, prometheus_response
 from app.models import AntibotEvent, Job, JobEvent, ProxyProfile, ScrapedItem, Source
-from app.schemas import JobCreate, JobRead, ProxyRead, ScrapedItemRead, SourceRead
+from app.schemas import JobCreate, JobRead, ProxyRead, ScrapedItemPageRead, ScrapedItemRead, SourceRead
 from app.services.bootstrap import seed_defaults
 from app.services.queue import enqueue_scrape_job
+from app.settings import get_settings
 
 app = FastAPI(title="ScaleScrape Lab API", version="0.1.0")
+settings = get_settings()
+Path(settings.media_root).mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=settings.media_root), name="media")
 
 
 @app.on_event("startup")
@@ -89,6 +95,34 @@ def list_items(
         query = query.where(ScrapedItem.job_id == job_id)
     query = query.order_by(desc(ScrapedItem.created_at)).limit(limit)
     return list(session.scalars(query))
+
+
+@app.get("/items/page", response_model=ScrapedItemPageRead)
+def list_items_page(
+    source: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=50),
+    session: Session = Depends(get_session),
+) -> ScrapedItemPageRead:
+    filters = []
+    if source:
+        filters.append(Source.name == source)
+
+    count_query = select(func.count(ScrapedItem.id)).join(Job).join(Source)
+    item_query = select(ScrapedItem).join(Job).join(Source)
+    if filters:
+        count_query = count_query.where(*filters)
+        item_query = item_query.where(*filters)
+
+    total = session.scalar(count_query) or 0
+    items = list(
+        session.scalars(
+            item_query.order_by(desc(ScrapedItem.created_at))
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    )
+    return ScrapedItemPageRead(items=items, total=total, page=page, page_size=page_size)
 
 
 @app.get("/jobs/{job_id}/items", response_model=list[ScrapedItemRead])

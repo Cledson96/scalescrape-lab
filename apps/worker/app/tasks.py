@@ -49,6 +49,7 @@ def enqueue_scheduled_scrape_jobs() -> dict:
         interval_seconds=settings.scheduled_scrape_interval_seconds,
         protected_target_url=settings.scheduled_protected_target_url,
         books_to_scrape_url=settings.scheduled_books_to_scrape_url,
+        globo_home_url=settings.scheduled_globo_home_url,
     )
     created_jobs: list[dict] = []
     try:
@@ -96,6 +97,8 @@ def run_scrape_job(self, job_id: int) -> dict:
                 ),
                 page_timeout_seconds=settings.scraper_page_timeout_seconds,
                 gbp_to_brl_rate=settings.gbp_to_brl_rate,
+                media_root=settings.media_root,
+                globo_max_articles=settings.globo_max_articles,
             )
         )
         for record in records:

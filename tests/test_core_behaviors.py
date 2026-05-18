@@ -58,6 +58,13 @@ from app.books import (  # noqa: E402
     parse_books_price,
     parse_rating_class,
 )
+from app.globo import (  # noqa: E402
+    build_globo_record_payload,
+    extract_globo_external_id,
+    is_allowed_globo_image_url,
+    parse_globo_article_detail,
+    parse_globo_home_cards,
+)
 from app.schedule import scheduled_scrape_jobs  # noqa: E402
 from app.scraper import LoginCredentials, handle_login_if_present  # noqa: E402
 
@@ -312,17 +319,91 @@ class BooksToScrapeParserTests(unittest.TestCase):
 
 
 class ScheduledScrapeTests(unittest.TestCase):
-    def test_scheduled_scrape_jobs_runs_fake_and_books_sources_every_six_hours(self) -> None:
+    def test_scheduled_scrape_jobs_runs_all_demo_sources_every_six_hours(self) -> None:
         jobs = scheduled_scrape_jobs(interval_seconds=21600)
 
-        self.assertEqual([job["source"] for job in jobs], ["fake-target", "books-to-scrape"])
+        self.assertEqual([job["source"] for job in jobs], ["fake-target", "books-to-scrape", "globo-home"])
         self.assertEqual(jobs[0]["start_url"], "http://target-site:4000/protected/items?page=1")
         self.assertEqual(
             jobs[1]["start_url"],
             "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
         )
+        self.assertEqual(jobs[2]["start_url"], "https://www.globo.com/")
         self.assertTrue(all(job["mode"] == "browser" for job in jobs))
         self.assertTrue(all(job["interval_seconds"] == 21600 for job in jobs))
+
+
+class GloboParserTests(unittest.TestCase):
+    def test_parse_globo_home_cards_reads_category_title_link_and_image(self) -> None:
+        html = """
+        <div data-tracking-action="jornalismo">
+          <a class="post__link" href="https://g1.globo.com/saude/noticia/2026/05/18/remedio.ghtml" title="Remedio recolhido">
+            <figure><img class="post__image" src="https://s2-home-globo.glbimg.com/foto.jpg" /></figure>
+            <h2 class="post__title">Remedio recolhido</h2>
+          </a>
+        </div>
+        <div data-tracking-action="esporte">
+          <a class="post__link" href="https://example.com/noticia.ghtml" title="Ignorar">
+            <h2 class="post__title">Ignorar</h2>
+          </a>
+        </div>
+        """
+
+        cards = parse_globo_home_cards(html, base_url="https://www.globo.com/")
+
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["category"], "jornalismo")
+        self.assertEqual(cards[0]["title"], "Remedio recolhido")
+        self.assertEqual(cards[0]["detail_url"], "https://g1.globo.com/saude/noticia/2026/05/18/remedio.ghtml")
+        self.assertEqual(cards[0]["image_url"], "https://s2-home-globo.glbimg.com/foto.jpg")
+
+    def test_parse_globo_article_detail_prefers_open_graph_metadata(self) -> None:
+        html = """
+        <html>
+          <head>
+            <meta property="og:title" content="Titulo final | G1" />
+            <meta property="og:description" content="Resumo da noticia para o dashboard." />
+            <meta property="og:image" content="https://s2-g1.glbimg.com/final.jpg" />
+          </head>
+          <body>
+            <h1 class="content-head__title">Titulo no H1</h1>
+          </body>
+        </html>
+        """
+
+        detail = parse_globo_article_detail(html)
+
+        self.assertEqual(detail["title"], "Titulo final")
+        self.assertEqual(detail["description"], "Resumo da noticia para o dashboard.")
+        self.assertEqual(detail["image_url"], "https://s2-g1.glbimg.com/final.jpg")
+
+    def test_build_globo_record_payload_keeps_demo_fields(self) -> None:
+        payload = build_globo_record_payload(
+            title="Titulo final",
+            category="jornalismo",
+            detail_url="https://g1.globo.com/saude/noticia/2026/05/18/remedio.ghtml",
+            description="Resumo da noticia.",
+            image_original_url="https://s2-g1.glbimg.com/final.jpg",
+            image_path="/app/media/globo/remedio.jpg",
+            image_public_path="/media/globo/remedio.jpg",
+        )
+
+        self.assertEqual(payload["source"], "globo-home")
+        self.assertEqual(payload["category"], "jornalismo")
+        self.assertEqual(payload["title"], "Titulo final")
+        self.assertEqual(payload["description"], "Resumo da noticia.")
+        self.assertEqual(payload["image_original_url"], "https://s2-g1.glbimg.com/final.jpg")
+        self.assertEqual(payload["image_path"], "/app/media/globo/remedio.jpg")
+        self.assertEqual(payload["image_public_path"], "/media/globo/remedio.jpg")
+
+    def test_globo_helpers_limit_hosts_and_stable_external_id(self) -> None:
+        external_id = extract_globo_external_id(
+            "https://g1.globo.com/saude/noticia/2026/05/18/remedio.ghtml"
+        )
+
+        self.assertEqual(external_id, "g1-globo-com-saude-noticia-2026-05-18-remedio")
+        self.assertTrue(is_allowed_globo_image_url("https://s2-g1.glbimg.com/final.jpg"))
+        self.assertFalse(is_allowed_globo_image_url("https://example.com/final.jpg"))
 
 
 class ApiItemsSchemaTests(unittest.TestCase):
@@ -356,7 +437,9 @@ class ApiItemsSchemaTests(unittest.TestCase):
 
     def test_scraped_item_read_exposes_raw_extracted_data(self) -> None:
         previous = os.environ.get("PUBLIC_TARGET_SITE_URL")
+        previous_public_api = os.environ.get("PUBLIC_API_URL")
         os.environ["PUBLIC_TARGET_SITE_URL"] = "https://dev.scalescrape.cledson.com.br"
+        os.environ["PUBLIC_API_URL"] = "https://api-dev.scalescrape.cledson.com.br"
         item = ScrapedItemRead.model_validate(
             {
                 "id": 10,
@@ -367,6 +450,7 @@ class ApiItemsSchemaTests(unittest.TestCase):
                 "raw_data": {
                     "price": {"amount": 54.86, "brl_amount": 356.59},
                     "description": "Set in the far future.",
+                    "image_public_path": "/media/globo/remedio.jpg",
                 },
                 "created_at": "2026-05-18T12:00:00",
                 "extracted_at": "2026-05-18T12:00:00",
@@ -376,6 +460,7 @@ class ApiItemsSchemaTests(unittest.TestCase):
             self.assertEqual(item.title, "Dune (Dune #1)")
             self.assertEqual(item.extracted_at.isoformat(), "2026-05-18T12:00:00")
             self.assertEqual(item.public_detail_url, "https://dev.scalescrape.cledson.com.br/items/protected-1")
+            self.assertEqual(item.public_image_url, "https://api-dev.scalescrape.cledson.com.br/media/globo/remedio.jpg")
             self.assertEqual(item.raw_data["price"]["brl_amount"], 356.59)
             self.assertEqual(item.raw_data["description"], "Set in the far future.")
         finally:
@@ -383,6 +468,34 @@ class ApiItemsSchemaTests(unittest.TestCase):
                 os.environ.pop("PUBLIC_TARGET_SITE_URL", None)
             else:
                 os.environ["PUBLIC_TARGET_SITE_URL"] = previous
+            if previous_public_api is None:
+                os.environ.pop("PUBLIC_API_URL", None)
+            else:
+                os.environ["PUBLIC_API_URL"] = previous_public_api
+
+    def test_scraped_item_page_read_exposes_pagination_metadata(self) -> None:
+        item = ScrapedItemRead.model_validate(
+            {
+                "id": 1,
+                "job_id": 1,
+                "external_id": "item-1",
+                "title": "Item 1",
+                "detail_url": "https://www.globo.com/noticia.ghtml",
+                "raw_data": {"source": "globo-home"},
+                "created_at": "2026-05-18T12:00:00",
+                "extracted_at": "2026-05-18T12:00:00",
+            }
+        )
+
+        page = api_dto.ScrapedItemPageRead(
+            items=[item],
+            total=21,
+            page=2,
+            page_size=10,
+        )
+
+        self.assertEqual(page.total_pages, 3)
+        self.assertEqual(page.items[0].raw_data["source"], "globo-home")
 
     def test_scraped_item_read_can_alias_created_at_as_extracted_at(self) -> None:
         class FakeScrapedItem:

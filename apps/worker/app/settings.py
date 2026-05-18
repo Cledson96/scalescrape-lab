@@ -25,6 +25,8 @@ class Settings:
     scraper_page_timeout_seconds: int = int(os.getenv("SCRAPER_PAGE_TIMEOUT_SECONDS", "30"))
     scraper_job_timeout_seconds: int = int(os.getenv("SCRAPER_JOB_TIMEOUT_SECONDS", "180"))
     gbp_to_brl_rate: float = float(os.getenv("GBP_TO_BRL_RATE", "6.50"))
+    media_root: str = os.getenv("MEDIA_ROOT", "/app/media")
+    globo_max_articles: int = int(os.getenv("GLOBO_MAX_ARTICLES", "12"))
     enable_scheduled_scraping: bool = os.getenv("ENABLE_SCHEDULED_SCRAPING", "true").lower() == "true"
     scheduled_scrape_interval_seconds: int = int(os.getenv("SCHEDULED_SCRAPE_INTERVAL_SECONDS", "21600"))
     scheduled_protected_target_url: str = os.getenv(
@@ -35,6 +37,7 @@ class Settings:
         "SCHEDULED_BOOKS_TO_SCRAPE_URL",
         "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
     )
+    scheduled_globo_home_url: str = os.getenv("SCHEDULED_GLOBO_HOME_URL", "https://www.globo.com/")
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -46,7 +49,7 @@ class Settings:
             self,
             "allowed_proxy_target_hosts",
             csv_env("ALLOWED_PROXY_TARGET_HOSTS", "target-site,localhost,127.0.0.1")
-            | {"books.toscrape.com"},
+            | {"books.toscrape.com", "www.globo.com"},
         )
 
 

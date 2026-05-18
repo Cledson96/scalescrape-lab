@@ -1,4 +1,5 @@
 from datetime import datetime
+from math import ceil
 import os
 from pydantic import BaseModel, Field, computed_field
 
@@ -9,6 +10,29 @@ def public_url_for(url: str):  # noqa: ANN201
     if url.startswith(internal_base):
         return f"{public_base}{url.removeprefix(internal_base)}"
     return url
+
+
+def public_api_url_for(path: str) -> str:
+    public_base = os.getenv("PUBLIC_API_URL", "http://localhost:8000").rstrip("/")
+    return f"{public_base}/{path.lstrip('/')}"
+
+
+def public_media_url(raw_data: dict) -> str | None:
+    public_path = raw_data.get("image_public_path")
+    if isinstance(public_path, str) and public_path:
+        return public_api_url_for(public_path)
+
+    image_path = raw_data.get("image_path")
+    if not isinstance(image_path, str) or not image_path:
+        return None
+
+    media_root = os.getenv("MEDIA_ROOT", "/app/media").rstrip("/\\")
+    normalized_image = image_path.replace("\\", "/")
+    normalized_root = media_root.replace("\\", "/").rstrip("/")
+    if normalized_image.startswith(normalized_root):
+        relative_path = normalized_image.removeprefix(normalized_root).lstrip("/")
+        return public_api_url_for(f"/media/{relative_path}")
+    return None
 
 
 class JobCreate(BaseModel):
@@ -54,6 +78,25 @@ class ScrapedItemRead(BaseModel):
     @property
     def public_detail_url(self) -> str:
         return public_url_for(self.detail_url)
+
+    @computed_field
+    @property
+    def public_image_url(self) -> str | None:
+        return public_media_url(self.raw_data)
+
+
+class ScrapedItemPageRead(BaseModel):
+    items: list[ScrapedItemRead]
+    total: int
+    page: int
+    page_size: int
+
+    @computed_field
+    @property
+    def total_pages(self) -> int:
+        if self.total == 0:
+            return 0
+        return ceil(self.total / self.page_size)
 
 
 class SourceRead(BaseModel):

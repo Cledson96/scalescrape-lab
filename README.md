@@ -10,6 +10,9 @@ controle de concorrencia, retry/backoff, DLQ, circuit breaker, politicas de
 seguranca, metricas e observabilidade. Tudo roda contra um target-site local do
 proprio projeto.
 
+Os itens extraidos sao persistidos no PostgreSQL em `scraped_items`, com
+`created_at` e `extracted_at` representando a data/hora da extracao.
+
 Para uma explicacao detalhada do fluxo do job, veja
 [docs/fluxo-scraping.md](docs/fluxo-scraping.md).
 
@@ -25,6 +28,8 @@ PostgreSQL + job_events
 RabbitMQ
         ↓
 Celery Workers
+        ↓
+Celery Beat Scheduler (a cada 6h)
         ↓
 Playwright headless
         ↓
@@ -44,6 +49,7 @@ Anti-Bot Simulator
 - Python + FastAPI para API de orquestracao
 - Next.js 16 + TypeScript para target-site fake visual
 - Celery + RabbitMQ para filas
+- Celery Beat para agendamento periodico a cada 6 horas
 - Playwright Python para scraping
 - PostgreSQL com SQLAlchemy
 - Prometheus + Grafana para monitoramento
@@ -83,7 +89,7 @@ dados preservam os seletores usados pelo Playwright:
 - `/items?page=1`: dataset local sintetico, paginado e estavel
 - `/login?next=/protected/items?page=1`: login fake com CAPTCHA de laboratorio
 - `/protected/items?page=1`: dataset sob login, anti-bot local, session, risco e challenge
-- `/external/items?page=1`: massa fake externa via RandomUser, com fallback local
+- `/external/items?page=1`: massa dinamica via API real RandomUser, cache de 6h e fallback local
 - `/rate-limited/items`: resposta `429` para testar retry e cooldown
 - `/forbidden/items`: resposta `403` para testar bloqueio
 - `/unstable/items?page=1`: paginas pares retornam `500`
@@ -128,6 +134,26 @@ Depois que o job terminar, veja os registros extraidos em:
 ```text
 GET /items
 GET /jobs/{job_id}/items
+```
+
+Cada item retorna `extracted_at` e tambem grava esse horario em `raw_data` para
+facilitar a demonstracao do momento em que o dado foi coletado.
+
+## Agendamento A Cada 6 Horas
+
+O projeto inclui um servico `scheduler` com Celery Beat. Ele funciona como um
+cron job e dispara automaticamente, a cada 6 horas, dois scrapings de demo:
+
+- `fake-target`: `http://target-site:4000/protected/items?page=1`
+- `books-to-scrape`: `https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html`
+
+Configuracao:
+
+```env
+ENABLE_SCHEDULED_SCRAPING=true
+SCHEDULED_SCRAPE_INTERVAL_SECONDS=21600
+SCHEDULED_PROTECTED_TARGET_URL=http://target-site:4000/protected/items?page=1
+SCHEDULED_BOOKS_TO_SCRAPE_URL=https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
 ```
 
 Outros cenarios do target controlado:

@@ -11,6 +11,7 @@ trabalhando juntos.
 POST /jobs
   -> Postgres: jobs + job_events
   -> RabbitMQ: fila scrape.jobs
+  -> Celery Beat cria jobs periodicos a cada 6 horas
   -> Celery worker
   -> Playwright headless
   -> Target-site Next.js
@@ -36,6 +37,13 @@ A API FastAPI recebe `POST /jobs` com uma URL inicial:
 
 Ela valida a fonte, cria um registro em `jobs`, grava um evento `job_created` e
 publica a tarefa `app.tasks.run_scrape_job` na fila `scrape.jobs`.
+
+Tambem existe o fluxo automatico: o servico `scheduler`, rodando Celery Beat,
+dispara `app.tasks.enqueue_scheduled_scrape_jobs` a cada 21600 segundos
+(6 horas). Essa tarefa cria dois jobs:
+
+- target protegido do laboratorio;
+- Books to Scrape na categoria Science Fiction.
 
 Para demonstrar um segundo scraping externo seguro, use a fonte
 `books-to-scrape`:
@@ -123,7 +131,11 @@ No Books to Scrape, o worker usa outro adaptador:
 
 ## 6. Persistencia E Status
 
-Ao final, os dados vao para `scraped_items`. O job recebe um destes status:
+Ao final, os dados vao para `scraped_items`. O campo `created_at` e exposto pela
+API tambem como `extracted_at`, deixando claro quando cada item foi coletado.
+O mesmo horario e gravado em `raw_data.extracted_at`.
+
+O job recebe um destes status:
 
 - `success`: terminou e encontrou itens;
 - `failed`: erro tecnico ou layout inesperado;
@@ -140,6 +152,10 @@ Os dados coletados podem ser vistos pela API:
 GET /items
 GET /jobs/{job_id}/items
 ```
+
+O target-site tambem tem uma fonte dinamica propria: `/external/items` busca a
+API real RandomUser, normaliza os dados sem expor e-mail/telefone/documento, usa
+cache de 6 horas e fallback local se a API externa ficar indisponivel.
 
 ## 7. Observabilidade
 

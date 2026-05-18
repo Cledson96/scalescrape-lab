@@ -1,5 +1,14 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+import os
+from pydantic import BaseModel, Field, computed_field
+
+
+def public_url_for(url: str):  # noqa: ANN201
+    public_base = os.getenv("PUBLIC_TARGET_SITE_URL", "http://localhost:4000").rstrip("/")
+    internal_base = "http://target-site:4000"
+    if url.startswith(internal_base):
+        return f"{public_base}{url.removeprefix(internal_base)}"
+    return url
 
 
 class JobCreate(BaseModel):
@@ -23,6 +32,11 @@ class JobRead(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @computed_field
+    @property
+    def public_url(self) -> str:
+        return public_url_for(self.start_url)
+
 
 class ScrapedItemRead(BaseModel):
     id: int
@@ -35,6 +49,11 @@ class ScrapedItemRead(BaseModel):
     extracted_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @computed_field
+    @property
+    def public_detail_url(self) -> str:
+        return public_url_for(self.detail_url)
 
 
 class SourceRead(BaseModel):

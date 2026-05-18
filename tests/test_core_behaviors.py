@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime
 import importlib.util
+import os
 from pathlib import Path
 import sys
 import types
@@ -325,14 +326,44 @@ class ScheduledScrapeTests(unittest.TestCase):
 
 
 class ApiItemsSchemaTests(unittest.TestCase):
+    def test_job_read_exposes_public_url_for_internal_target_site_url(self) -> None:
+        previous = os.environ.get("PUBLIC_TARGET_SITE_URL")
+        os.environ["PUBLIC_TARGET_SITE_URL"] = "https://dev.scalescrape.cledson.com.br"
+        try:
+            job = api_dto.JobRead.model_validate(
+                {
+                    "id": 12,
+                    "source_id": 1,
+                    "start_url": "http://target-site:4000/protected/items?page=1",
+                    "status": "success",
+                    "mode": "browser",
+                    "max_pages": 1,
+                    "attempts": 0,
+                    "items_found": 12,
+                    "error_message": None,
+                    "created_at": "2026-05-18T21:52:13.392016",
+                }
+            )
+            self.assertEqual(
+                job.public_url,
+                "https://dev.scalescrape.cledson.com.br/protected/items?page=1",
+            )
+        finally:
+            if previous is None:
+                os.environ.pop("PUBLIC_TARGET_SITE_URL", None)
+            else:
+                os.environ["PUBLIC_TARGET_SITE_URL"] = previous
+
     def test_scraped_item_read_exposes_raw_extracted_data(self) -> None:
+        previous = os.environ.get("PUBLIC_TARGET_SITE_URL")
+        os.environ["PUBLIC_TARGET_SITE_URL"] = "https://dev.scalescrape.cledson.com.br"
         item = ScrapedItemRead.model_validate(
             {
                 "id": 10,
                 "job_id": 2,
                 "external_id": "dune-dune-1_151",
                 "title": "Dune (Dune #1)",
-                "detail_url": "https://books.toscrape.com/catalogue/dune-dune-1_151/index.html",
+                "detail_url": "http://target-site:4000/items/protected-1",
                 "raw_data": {
                     "price": {"amount": 54.86, "brl_amount": 356.59},
                     "description": "Set in the far future.",
@@ -341,11 +372,17 @@ class ApiItemsSchemaTests(unittest.TestCase):
                 "extracted_at": "2026-05-18T12:00:00",
             }
         )
-
-        self.assertEqual(item.title, "Dune (Dune #1)")
-        self.assertEqual(item.extracted_at.isoformat(), "2026-05-18T12:00:00")
-        self.assertEqual(item.raw_data["price"]["brl_amount"], 356.59)
-        self.assertEqual(item.raw_data["description"], "Set in the far future.")
+        try:
+            self.assertEqual(item.title, "Dune (Dune #1)")
+            self.assertEqual(item.extracted_at.isoformat(), "2026-05-18T12:00:00")
+            self.assertEqual(item.public_detail_url, "https://dev.scalescrape.cledson.com.br/items/protected-1")
+            self.assertEqual(item.raw_data["price"]["brl_amount"], 356.59)
+            self.assertEqual(item.raw_data["description"], "Set in the far future.")
+        finally:
+            if previous is None:
+                os.environ.pop("PUBLIC_TARGET_SITE_URL", None)
+            else:
+                os.environ["PUBLIC_TARGET_SITE_URL"] = previous
 
     def test_scraped_item_read_can_alias_created_at_as_extracted_at(self) -> None:
         class FakeScrapedItem:

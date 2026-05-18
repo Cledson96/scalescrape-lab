@@ -155,6 +155,8 @@ jobs:
             GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
             DATABASE_URL=postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@postgres:5432/scalescrape
             RABBITMQ_URL=amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672//
+            PUBLIC_TARGET_SITE_URL=https://scalescrape.cledson.com.br
+            SCALESCRAPE_API_URL=http://api:8000
             ENABLE_REAL_2CAPTCHA=true
             TWO_CAPTCHA_API_KEY=${TWO_CAPTCHA_API_KEY}
             RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY}

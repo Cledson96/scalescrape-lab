@@ -1,9 +1,35 @@
+import asyncio
 import importlib.util
 from pathlib import Path
 import sys
+import types
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class NoopMetric:
+    def labels(self, **kwargs):  # noqa: ANN001
+        return self
+
+    def inc(self, amount: int = 1) -> None:
+        return None
+
+    def set(self, value: int) -> None:
+        return None
+
+    def observe(self, value: float) -> None:
+        return None
+
+
+sys.modules.setdefault(
+    "prometheus_client",
+    types.SimpleNamespace(
+        Counter=lambda *args, **kwargs: NoopMetric(),
+        Gauge=lambda *args, **kwargs: NoopMetric(),
+        Histogram=lambda *args, **kwargs: NoopMetric(),
+    ),
+)
 
 
 def load_module(name: str, path: Path):
@@ -23,6 +49,7 @@ from app.captcha.two_captcha_provider import (  # noqa: E402
     TwoCaptchaConfig,
     TwoCaptchaImageResolverProvider,
 )
+from app.scraper import LoginCredentials, handle_login_if_present  # noqa: E402
 
 PolicyError = worker_policy.PolicyError
 ensure_host_allowed = worker_policy.ensure_host_allowed
@@ -93,6 +120,83 @@ class WorkerCaptchaPolicyTests(unittest.TestCase):
         )
         with self.assertRaises(AppPolicyError):
             provider.solve_image_captcha(b"image", "example.com")
+
+
+class FakeLocator:
+    def __init__(self, count: int = 1, attr: str | None = None, screenshot: bytes = b"image") -> None:
+        self._count = count
+        self._attr = attr
+        self._screenshot = screenshot
+        self.filled_value: str | None = None
+        self.clicked = False
+
+    async def count(self) -> int:
+        return self._count
+
+    async def get_attribute(self, name: str) -> str | None:
+        return self._attr if name == "data-challenge-id" else None
+
+    async def screenshot(self, type: str) -> bytes:  # noqa: A002
+        return self._screenshot
+
+    async def fill(self, value: str) -> None:
+        self.filled_value = value
+
+    async def click(self) -> None:
+        self.clicked = True
+
+
+class FakeLoginPage:
+    def __init__(self) -> None:
+        self.locators = {
+            "#login-form": FakeLocator(),
+            "#captcha-challenge": FakeLocator(attr="challenge-1"),
+            "#captcha-image": FakeLocator(screenshot=b"captcha-bytes"),
+            "input[name='username']": FakeLocator(),
+            "input[name='password']": FakeLocator(),
+            "input[name='captcha_answer']": FakeLocator(),
+            "#login-form button[type='submit']": FakeLocator(),
+        }
+        self.waited_for: list[str] = []
+
+    def locator(self, selector: str) -> FakeLocator:
+        return self.locators[selector]
+
+    async def wait_for_load_state(self, state: str) -> None:
+        self.waited_for.append(state)
+
+
+class RecordingCaptchaProvider:
+    def __init__(self, answer: str = "ABCDE") -> None:
+        self.answer = answer
+        self.calls: list[tuple[bytes, str]] = []
+
+    def solve_image_captcha(self, image_bytes: bytes, source_host: str) -> str:
+        self.calls.append((image_bytes, source_host))
+        return self.answer
+
+
+class WorkerLoginFlowTests(unittest.TestCase):
+    def test_login_handler_solves_captcha_and_submits_credentials(self) -> None:
+        page = FakeLoginPage()
+        provider = RecordingCaptchaProvider(answer="SOLVED")
+
+        handled = asyncio.run(
+            handle_login_if_present(
+                page,
+                "http://target-site:4000/protected/items?page=1",
+                provider,
+                LoginCredentials(username="demo", password="demo123"),
+            )
+        )
+
+        self.assertTrue(handled)
+        self.assertEqual(provider.calls, [(b"captcha-bytes", "target-site")])
+        self.assertEqual(page.locators["input[name='username']"].filled_value, "demo")
+        self.assertEqual(page.locators["input[name='password']"].filled_value, "demo123")
+        self.assertEqual(page.locators["input[name='captcha_answer']"].filled_value, "SOLVED")
+        self.assertTrue(page.locators["#login-form button[type='submit']"].clicked)
+        self.assertEqual(page.waited_for, ["domcontentloaded"])
 
 
 if __name__ == "__main__":

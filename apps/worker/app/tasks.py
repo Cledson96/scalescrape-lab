@@ -19,7 +19,7 @@ from app.metrics import (
 from app.policy import PolicyError, ensure_host_allowed
 from app.proxy.manager import default_proxy_manager
 from app.proxy.policy import ensure_proxy_allowed
-from app.scraper import ScrapeBlocked, scrape_with_playwright
+from app.scraper import LoginCredentials, ScrapeBlocked, scrape_with_playwright
 from app.settings import settings
 
 engine = create_engine(settings.database_url, pool_pre_ping=True)
@@ -63,6 +63,10 @@ def run_scrape_job(self, job_id: int) -> dict:
                 max_pages=job["max_pages"],
                 proxy=proxy,
                 captcha_provider=make_captcha_provider(),
+                login_credentials=LoginCredentials(
+                    username=settings.target_site_username,
+                    password=settings.target_site_password,
+                ),
                 page_timeout_seconds=settings.scraper_page_timeout_seconds,
             )
         )

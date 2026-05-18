@@ -18,6 +18,12 @@ class ScrapedRecord:
     raw_data: dict
 
 
+@dataclass(frozen=True)
+class LoginCredentials:
+    username: str
+    password: str
+
+
 class ScrapeBlocked(RuntimeError):
     def __init__(self, status_code: int, message: str) -> None:
         self.status_code = status_code
@@ -30,6 +36,7 @@ async def scrape_with_playwright(
     max_pages: int,
     proxy: ProxyProfileState,
     captcha_provider: CaptchaResolverProvider,
+    login_credentials: LoginCredentials,
     page_timeout_seconds: int,
 ) -> list[ScrapedRecord]:
     from playwright.async_api import async_playwright
@@ -51,6 +58,12 @@ async def scrape_with_playwright(
             status = response.status if response else 0
             if status in (403, 429):
                 raise ScrapeBlocked(status, f"bloqueio HTTP {status}")
+
+            if await handle_login_if_present(page, current_url, captcha_provider, login_credentials):
+                response = await page.goto(current_url, wait_until="domcontentloaded")
+                status = response.status if response else 0
+                if status in (403, 429):
+                    raise ScrapeBlocked(status, f"bloqueio HTTP {status} apos login")
 
             if await page.locator("#captcha-challenge").count():
                 await solve_local_challenge(page, start_url, captcha_provider, proxy)
@@ -88,6 +101,38 @@ async def scrape_with_playwright(
 
         await browser.close()
     return records
+
+
+async def handle_login_if_present(
+    page,
+    start_url: str,
+    provider: CaptchaResolverProvider,
+    credentials: LoginCredentials,
+) -> bool:
+    login_form = page.locator("#login-form")
+    if await login_form.count() == 0:
+        return False
+
+    challenge = page.locator("#captcha-challenge")
+    challenge_id = await challenge.get_attribute("data-challenge-id")
+    if not challenge_id:
+        raise RuntimeError("login sem captcha local")
+
+    CAPTCHA_DETECTED.inc()
+    image = page.locator("#captcha-image")
+    image_bytes = await image.screenshot(type="png")
+    source_host = host_from_url(start_url)
+    start = monotonic()
+    solution = provider.solve_image_captcha(image_bytes, source_host)
+    CAPTCHA_SOLVE_DURATION.observe(monotonic() - start)
+    CAPTCHA_SOLVED.inc()
+
+    await page.locator("input[name='username']").fill(credentials.username)
+    await page.locator("input[name='password']").fill(credentials.password)
+    await page.locator("input[name='captcha_answer']").fill(solution)
+    await page.locator("#login-form button[type='submit']").click()
+    await page.wait_for_load_state("domcontentloaded")
+    return True
 
 
 async def solve_local_challenge(page, start_url: str, provider: CaptchaResolverProvider, proxy: ProxyProfileState) -> None:

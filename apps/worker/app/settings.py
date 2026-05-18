@@ -17,6 +17,8 @@ class Settings:
     two_captcha_api_key: str = os.getenv("TWO_CAPTCHA_API_KEY", "")
     allowed_captcha_hosts: set[str] = None  # type: ignore[assignment]
     max_captcha_solves_per_run: int = int(os.getenv("MAX_CAPTCHA_SOLVES_PER_RUN", "20"))
+    target_site_username: str = os.getenv("TARGET_SITE_USERNAME", "demo")
+    target_site_password: str = os.getenv("TARGET_SITE_PASSWORD", "demo123")
     enable_proxy_rotation: bool = os.getenv("ENABLE_PROXY_ROTATION", "true").lower() == "true"
     allowed_proxy_target_hosts: set[str] = None  # type: ignore[assignment]
     scraper_max_attempts: int = int(os.getenv("SCRAPER_MAX_ATTEMPTS", "3"))

@@ -12,9 +12,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
+      <head>
+        <script src="https://www.google.com/recaptcha/api.js" async defer />
+      </head>
       <body>
         <Shell>{children}</Shell>
       </body>
     </html>
   );
 }
+

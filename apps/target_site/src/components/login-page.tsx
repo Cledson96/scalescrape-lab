@@ -1,12 +1,12 @@
 import React from "react";
 
 type LoginPageProps = {
-  challengeId: string;
+  recaptchaSiteKey: string;
   nextPath: string;
   error?: string;
 };
 
-export function LoginPage({ challengeId, nextPath, error }: LoginPageProps) {
+export function LoginPage({ recaptchaSiteKey, nextPath, error }: LoginPageProps) {
   return (
     <main className="content">
       <section className="login-panel">
@@ -15,12 +15,11 @@ export function LoginPage({ challengeId, nextPath, error }: LoginPageProps) {
           <h1>Login do simulador antifraude</h1>
           <p>
             Esta etapa simula um portal cadastral protegido: o worker precisa autenticar,
-            resolver o captcha proprio do laboratorio e continuar a coleta.
+            resolver o reCAPTCHA do Google e continuar a coleta.
           </p>
         </div>
         <form id="login-form" className="login-form" action="/login/submit" method="post">
           <input type="hidden" name="next" value={nextPath} />
-          <input type="hidden" name="challenge_id" value={challengeId} />
 
           <label>
             Usuario
@@ -32,16 +31,15 @@ export function LoginPage({ challengeId, nextPath, error }: LoginPageProps) {
             <input name="password" type="password" autoComplete="current-password" defaultValue="demo123" />
           </label>
 
-          <section id="captcha-challenge" data-challenge-id={challengeId} className="captcha-box">
+          <section id="captcha-challenge" data-challenge-id="recaptcha" className="captcha-box">
             <div>
-              <strong>Captcha local</strong>
-              <span>Resolvido por mock ou 2Captcha real quando habilitado.</span>
+              <strong>Google reCAPTCHA</strong>
+              <span>Resolvido por 2Captcha real quando habilitado, ou aceita qualquer token com chaves de teste.</span>
             </div>
-            <img id="captcha-image" src={`/captcha/image/${challengeId}`} alt="captcha local" />
-            <label>
-              Resposta do captcha
-              <input name="captcha_answer" autoComplete="off" />
-            </label>
+            <div
+              className="g-recaptcha"
+              data-sitekey={recaptchaSiteKey}
+            />
           </section>
 
           {error ? <p className="form-error">Credenciais ou captcha invalidos.</p> : null}
@@ -52,3 +50,4 @@ export function LoginPage({ challengeId, nextPath, error }: LoginPageProps) {
     </main>
   );
 }
+

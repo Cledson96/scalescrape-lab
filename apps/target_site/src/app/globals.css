@@ -440,6 +440,10 @@ a {
   background: #ffffff;
 }
 
+.captcha-box .g-recaptcha {
+  margin-top: 4px;
+}
+
 .form-error {
   margin: 0;
   color: var(--red);

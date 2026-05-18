@@ -8,3 +8,6 @@ class MockCaptchaResolverProvider(CaptchaResolverProvider):
     def solve_image_captcha(self, image_bytes: bytes, source_host: str) -> str:
         return self.answer
 
+    def solve_recaptcha(self, sitekey: str, page_url: str, source_host: str) -> str:
+        return "mock-recaptcha-token"
+

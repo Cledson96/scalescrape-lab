@@ -25,7 +25,7 @@ class TwoCaptchaImageResolverProvider(CaptchaResolverProvider):
         self.config = config
         self.solve_count = 0
 
-    def solve_image_captcha(self, image_bytes: bytes, source_host: str) -> str:
+    def _guard(self, source_host: str) -> None:
         ensure_host_allowed(source_host, self.config.allowed_hosts, "captcha_solver")
         if not self.config.enabled:
             raise RuntimeError("2Captcha real desativado por ENABLE_REAL_2CAPTCHA=false")
@@ -34,11 +34,19 @@ class TwoCaptchaImageResolverProvider(CaptchaResolverProvider):
         if self.solve_count >= self.config.max_solves_per_run:
             raise RuntimeError("limite MAX_CAPTCHA_SOLVES_PER_RUN atingido")
 
+    def solve_image_captcha(self, image_bytes: bytes, source_host: str) -> str:
+        self._guard(source_host)
         self.solve_count += 1
-        captcha_id = self._submit(image_bytes)
+        captcha_id = self._submit_image(image_bytes)
         return self._poll(captcha_id)
 
-    def _submit(self, image_bytes: bytes) -> str:
+    def solve_recaptcha(self, sitekey: str, page_url: str, source_host: str) -> str:
+        self._guard(source_host)
+        self.solve_count += 1
+        captcha_id = self._submit_recaptcha(sitekey, page_url)
+        return self._poll(captcha_id)
+
+    def _submit_image(self, image_bytes: bytes) -> str:
         body = urlencode(
             {
                 "key": self.config.api_key,
@@ -52,6 +60,23 @@ class TwoCaptchaImageResolverProvider(CaptchaResolverProvider):
             payload = response.read().decode("utf-8")
         if not payload.startswith("OK|"):
             raise RuntimeError(f"2Captcha submit falhou: {payload}")
+        return payload.split("|", 1)[1]
+
+    def _submit_recaptcha(self, sitekey: str, page_url: str) -> str:
+        body = urlencode(
+            {
+                "key": self.config.api_key,
+                "method": "userrecaptcha",
+                "googlekey": sitekey,
+                "pageurl": page_url,
+                "json": 0,
+            }
+        ).encode("utf-8")
+        request = Request("https://2captcha.com/in.php", data=body, method="POST")
+        with urlopen(request, timeout=30) as response:
+            payload = response.read().decode("utf-8")
+        if not payload.startswith("OK|"):
+            raise RuntimeError(f"2Captcha recaptcha submit falhou: {payload}")
         return payload.split("|", 1)[1]
 
     def _poll(self, captcha_id: str) -> str:
@@ -74,4 +99,5 @@ class TwoCaptchaImageResolverProvider(CaptchaResolverProvider):
                 return payload.split("|", 1)[1]
             raise RuntimeError(f"2Captcha poll falhou: {payload}")
         raise TimeoutError("tempo limite aguardando resposta do 2Captcha")
+
 

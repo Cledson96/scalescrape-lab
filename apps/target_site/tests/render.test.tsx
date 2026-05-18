@@ -43,17 +43,16 @@ test("items page preserves scraper selectors", () => {
   assert.match(html, /data-item-id="normal-1"/);
 });
 
-test("login page renders form and captcha selectors used by the worker", () => {
+test("login page renders form and reCAPTCHA widget used by the worker", () => {
   const html = renderToStaticMarkup(
-    <LoginPage challengeId="challenge-1" nextPath="/protected/items?page=1" />
+    <LoginPage recaptchaSiteKey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" nextPath="/protected/items?page=1" />
   );
 
   assert.match(html, /id="login-form"/);
   assert.match(html, /name="username"/);
   assert.match(html, /name="password"/);
-  assert.match(html, /name="captcha_answer"/);
-  assert.match(html, /name="challenge_id"/);
   assert.match(html, /id="captcha-challenge"/);
-  assert.match(html, /data-challenge-id="challenge-1"/);
-  assert.match(html, /id="captcha-image"/);
+  assert.match(html, /data-challenge-id="recaptcha"/);
+  assert.match(html, /g-recaptcha/);
+  assert.match(html, /data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"/);
 });

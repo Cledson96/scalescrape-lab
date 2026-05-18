@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { normalizeNextPath, validateLoginCredentials } from "../../../lib/auth";
-import { captchaStore } from "../../../lib/captcha";
+import { verifyRecaptcha } from "../../../lib/recaptcha";
 
 function redirectTarget(request: Request, path: string): URL {
   const fallbackUrl = new URL(request.url);
@@ -16,12 +16,11 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const username = String(form.get("username") ?? "");
   const password = String(form.get("password") ?? "");
-  const captchaAnswer = String(form.get("captcha_answer") ?? "");
-  const challengeId = String(form.get("challenge_id") ?? "");
+  const recaptchaToken = String(form.get("g-recaptcha-response") ?? "");
   const nextPath = normalizeNextPath(String(form.get("next") ?? ""));
 
   const credentialsOk = validateLoginCredentials(username, password);
-  const captchaOk = captchaStore.verify(challengeId, captchaAnswer);
+  const captchaOk = await verifyRecaptcha(recaptchaToken);
 
   if (!credentialsOk || !captchaOk) {
     const loginUrl = redirectTarget(request, "/login");
@@ -43,3 +42,4 @@ export async function POST(request: Request) {
   });
   return response;
 }
+

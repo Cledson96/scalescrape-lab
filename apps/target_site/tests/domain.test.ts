@@ -154,12 +154,11 @@ test("target-site only leaves login, captcha and assets public", () => {
 });
 
 test("login submit redirects with the original request host", async () => {
-  const challenge = captchaStore.create();
+  // With Google's test secret key (default), any token is accepted
   const form = new URLSearchParams({
     username: "demo",
     password: "demo123",
-    challenge_id: challenge.challengeId,
-    captcha_answer: challenge.expectedAnswer,
+    "g-recaptcha-response": "test-recaptcha-token",
     next: "/protected/items?page=1"
   });
   const response = await submitLogin(

@@ -125,8 +125,12 @@ async def handle_login_if_present(
             raise RuntimeError("reCAPTCHA widget sem data-sitekey")
         source_host = host_from_url(start_url)
         page_url = page.url
+        # 2Captcha API validation rejects URLs without valid domains/TLDs (like 'target-site').
+        # We swap it to 'localhost' which is accepted by 2Captcha and our reCAPTCHA keys.
+        safe_page_url = page_url.replace("http://target-site:", "http://localhost:")
+        
         start = monotonic()
-        token = await asyncio.to_thread(provider.solve_recaptcha, sitekey, page_url, source_host)
+        token = await asyncio.to_thread(provider.solve_recaptcha, sitekey, safe_page_url, source_host)
         CAPTCHA_SOLVE_DURATION.observe(monotonic() - start)
         CAPTCHA_SOLVED.inc()
 

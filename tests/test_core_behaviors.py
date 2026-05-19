@@ -67,6 +67,7 @@ from app.globo import (  # noqa: E402
 )
 from app.schedule import scheduled_scrape_jobs  # noqa: E402
 from app.scraper import (  # noqa: E402
+    betano_debug_artifact_paths,
     LoginCredentials,
     betano_block_message,
     betano_no_league_tabs_message,
@@ -364,6 +365,25 @@ class BetanoDiagnosticsTests(unittest.TestCase):
                 "Nenhuma aba de liga encontrada na secao POPULARES do Betano "
                 "(clickables=42, odds=9, url=https://www.betano.bet.br/sport/futebol/)"
             ),
+        )
+
+    def test_betano_debug_artifact_paths_expose_public_urls(self) -> None:
+        artifact = betano_debug_artifact_paths(
+            media_root="/app/media",
+            stem="job-52-403",
+            public_api_url="https://api-dev.scalescrape.cledson.com.br",
+        )
+
+        self.assertEqual(artifact.metadata_path, "/app/media/betano-debug/job-52-403.json")
+        self.assertEqual(artifact.screenshot_path, "/app/media/betano-debug/job-52-403.png")
+        self.assertEqual(artifact.html_path, "/app/media/betano-debug/job-52-403.html")
+        self.assertEqual(
+            artifact.metadata_url,
+            "https://api-dev.scalescrape.cledson.com.br/media/betano-debug/job-52-403.json",
+        )
+        self.assertEqual(
+            artifact.screenshot_url,
+            "https://api-dev.scalescrape.cledson.com.br/media/betano-debug/job-52-403.png",
         )
 
 

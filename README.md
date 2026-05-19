@@ -390,6 +390,13 @@ O valor esperado e algo como:
 socks5://100.81.81.109:1080
 ```
 
+Quando `BETANO_DEBUG_ARTIFACTS=true`, o worker salva evidencias visuais das
+falhas da Betano em `/app/media/betano-debug`: um JSON com metadados, um HTML e
+um screenshot. Como o volume de media tambem e servido pela API, o erro do job
+passa a trazer um link `debug=https://api.../media/betano-debug/<arquivo>.json`
+para abrir no navegador e entender se houve 403, redirect, pagina vazia ou
+mudanca de markup.
+
 ## Regras De Seguranca
 
 Este projeto pode:

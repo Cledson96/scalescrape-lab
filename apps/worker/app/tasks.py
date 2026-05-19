@@ -99,9 +99,12 @@ def run_scrape_job(self, job_id: int) -> dict:
                 page_timeout_seconds=settings.scraper_page_timeout_seconds,
                 gbp_to_brl_rate=settings.gbp_to_brl_rate,
                 media_root=settings.media_root,
+                public_api_url=settings.public_api_url,
                 globo_max_articles=settings.globo_max_articles,
                 betano_max_leagues=settings.betano_max_leagues,
                 betano_proxy_url=settings.betano_proxy_url,
+                betano_debug_artifacts=settings.betano_debug_artifacts,
+                betano_debug_max_artifacts=settings.betano_debug_max_artifacts,
             )
         )
         for record in records:

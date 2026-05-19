@@ -26,6 +26,7 @@ class Settings:
     scraper_job_timeout_seconds: int = int(os.getenv("SCRAPER_JOB_TIMEOUT_SECONDS", "180"))
     gbp_to_brl_rate: float = float(os.getenv("GBP_TO_BRL_RATE", "6.50"))
     media_root: str = os.getenv("MEDIA_ROOT", "/app/media")
+    public_api_url: str = os.getenv("PUBLIC_API_URL", "http://localhost:8000")
     globo_max_articles: int = int(os.getenv("GLOBO_MAX_ARTICLES", "12"))
     enable_scheduled_scraping: bool = os.getenv("ENABLE_SCHEDULED_SCRAPING", "true").lower() == "true"
     scheduled_scrape_interval_seconds: int = int(os.getenv("SCHEDULED_SCRAPE_INTERVAL_SECONDS", "21600"))
@@ -44,6 +45,8 @@ class Settings:
     )
     betano_max_leagues: int = int(os.getenv("BETANO_MAX_LEAGUES", "10"))
     betano_proxy_url: str = os.getenv("BETANO_PROXY_URL", "auto")
+    betano_debug_artifacts: bool = os.getenv("BETANO_DEBUG_ARTIFACTS", "false").lower() == "true"
+    betano_debug_max_artifacts: int = int(os.getenv("BETANO_DEBUG_MAX_ARTIFACTS", "40"))
 
     def __post_init__(self) -> None:
         object.__setattr__(

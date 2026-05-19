@@ -1,65 +1,44 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-from billiard.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
-from app.clock import utc_now_naive
-from app.captcha.mock_provider import MockCaptchaResolverProvider
-from app.captcha.two_captcha_provider import TwoCaptchaConfig, TwoCaptchaImageResolverProvider
+from billiard.exceptions import SoftTimeLimitExceeded
+
 from app.jobs.celery_app import celery_app
+from app.jobs.events import add_event
+from app.jobs.proxy_state import persist_proxy_state, sync_proxy_manager_from_db
+from app.jobs.repository import (
+    create_scheduled_job,
+    load_job_for_processing,
+    mark_job,
+    replace_job_items,
+    start_job_attempt,
+)
+from app.jobs.retry import handle_retryable_failure
+from app.jobs.runtime import SessionLocal, make_captcha_provider, proxy_manager
+from app.jobs.schedule import scheduled_scrape_jobs
+from app.jobs.source_circuit import (
+    ACTIVE_SOURCE_STATUS,
+    CIRCUIT_OPEN_SOURCE_STATUS,
+    refresh_source_circuit,
+    source_unavailable_message,
+)
 from app.jobs.task_names import DEAD_LETTER_TASK, ENQUEUE_SCHEDULED_TASK, RUN_SCRAPE_TASK
 from app.observability.metrics import (
     PROXY_ACTIVE_JOBS,
     PROXY_SELECTED,
     SCRAPE_ITEMS,
     SCRAPE_JOBS_BLOCKED,
-    SCRAPE_JOBS_DEAD_LETTER,
-    SCRAPE_JOBS_FAILED,
     SCRAPE_JOBS_SUCCESS,
 )
-from app.jobs.item_persistence import build_scraped_item_rows
-from app.resilience.host_policy import PolicyError
-from app.proxy.manager import ProxyProfileState, default_proxy_manager, proxy_states_from_rows
 from app.proxy.policy import ensure_proxy_allowed
-from app.resilience.retry_policy import retry_countdown_seconds, status_after_retryable_failure
-from app.jobs.schedule import scheduled_scrape_jobs
+from app.resilience.host_policy import PolicyError
 from app.scraping.contracts import LoginCredentials, ScrapeBlocked
 from app.scraping.orchestrator import scrape_with_playwright
 from app.settings import settings
-from app.resilience.source_circuit import (
-    ACTIVE_SOURCE_STATUS,
-    CIRCUIT_OPEN_SOURCE_STATUS,
-    next_source_circuit_deadline,
-    normalize_source_circuit,
-    should_open_source_circuit,
-)
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-proxy_manager = default_proxy_manager(
-    max_concurrent_jobs=settings.max_concurrent_jobs_per_proxy,
-    cooldown_seconds=settings.proxy_cooldown_seconds,
-    enable_rotation=settings.enable_proxy_rotation,
-)
-TERMINAL_JOB_STATUSES = {"success", "failed", "blocked", "rate_limited", "blocked_by_policy", "dead_lettered"}
 logger = logging.getLogger(__name__)
-
-
-def make_captcha_provider():
-    if settings.enable_real_2captcha:
-        return TwoCaptchaImageResolverProvider(
-            TwoCaptchaConfig(
-                api_key=settings.two_captcha_api_key,
-                allowed_hosts=settings.allowed_captcha_hosts,
-                enabled=True,
-                max_solves_per_run=settings.max_captcha_solves_per_run,
-            )
-        )
-    return MockCaptchaResolverProvider(answer=settings.target_site_fixed_captcha_answer)
 
 
 @celery_app.task(name=ENQUEUE_SCHEDULED_TASK)
@@ -78,9 +57,7 @@ def enqueue_scheduled_scrape_jobs() -> dict:
         for job_definition in scheduled_jobs:
             job_id = create_scheduled_job(session, job_definition)
             if job_id is None:
-                skipped_sources.append(
-                    {"source": job_definition["source"], "reason": "source_unavailable"}
-                )
+                skipped_sources.append({"source": job_definition["source"], "reason": "source_unavailable"})
                 continue
             created_jobs.append({"job_id": job_id, "source": job_definition["source"]})
         session.commit()
@@ -108,18 +85,7 @@ def run_scrape_job(self, job_id: int) -> dict:
     proxy = None
     proxy_release_outcome = "success"
     try:
-        job = session.execute(
-            text(
-                """
-                select j.id, j.start_url, j.max_pages, j.source_id,
-                       s.name as source_name, s.status as source_status, s.circuit_open_until
-                from jobs j
-                join sources s on s.id = j.source_id
-                where j.id = :id
-                """
-            ),
-            {"id": job_id},
-        ).mappings().one()
+        job = load_job_for_processing(session, job_id)
         source_state = refresh_source_circuit(
             session,
             source_id=job["source_id"],
@@ -160,8 +126,9 @@ def run_scrape_job(self, job_id: int) -> dict:
             session.commit()
             SCRAPE_JOBS_BLOCKED.inc()
             return {"status": "blocked_by_policy", "source_status": source_state.status}
+
         ensure_proxy_allowed(job["start_url"], settings.allowed_proxy_target_hosts)
-        sync_proxy_manager_from_db(session)
+        sync_proxy_manager_from_db(session, proxy_manager)
         attempt = start_job_attempt(session, job_id)
         add_event(
             session,
@@ -171,6 +138,7 @@ def run_scrape_job(self, job_id: int) -> dict:
             {"attempt": attempt, "max_attempts": settings.scraper_max_attempts},
         )
         session.commit()
+
         proxy = proxy_manager.select()
         PROXY_SELECTED.inc()
         PROXY_ACTIVE_JOBS.labels(proxy=proxy.name).set(proxy.current_active_jobs)
@@ -246,353 +214,3 @@ def run_scrape_job(self, job_id: int) -> dict:
 @celery_app.task(name=DEAD_LETTER_TASK)
 def dead_letter_scrape_job(payload: dict) -> dict:
     return payload
-
-
-def create_scheduled_job(session, job_definition: dict) -> int | None:
-    session.execute(
-        text(
-            """
-            insert into sources (name, base_url, status, created_at, updated_at)
-            values (:source, :base_url, 'active', now(), now())
-            on conflict (name) do update
-            set base_url = excluded.base_url,
-                updated_at = now()
-            """
-        ),
-        {"source": job_definition["source"], "base_url": job_definition["start_url"]},
-    )
-    source = session.execute(
-        text("select id, status, circuit_open_until from sources where name = :source"),
-        {"source": job_definition["source"]},
-    ).mappings().one()
-    source_state = refresh_source_circuit(
-        session,
-        source_id=source["id"],
-        status=source["status"],
-        circuit_open_until=source["circuit_open_until"],
-    )
-    if source_state.status != ACTIVE_SOURCE_STATUS:
-        return None
-    job_id = session.execute(
-        text(
-            """
-            insert into jobs (source_id, start_url, status, mode, max_pages, attempts, items_found, created_at, updated_at)
-            values (:source_id, :start_url, 'pending', :mode, :max_pages, 0, 0, now(), now())
-            returning id
-            """
-        ),
-        {
-            "source_id": source["id"],
-            "start_url": job_definition["start_url"],
-            "mode": job_definition["mode"],
-            "max_pages": job_definition["max_pages"],
-        },
-    ).scalar_one()
-    session.execute(
-        text(
-            """
-            insert into job_events (job_id, event_type, message, metadata, created_at)
-            values (:job_id, 'scheduled_job_created', :message, cast(:metadata as jsonb), now())
-            """
-        ),
-        {
-            "job_id": job_id,
-            "message": "Job criado pelo agendador de scraping a cada 6 horas",
-            "metadata": json.dumps(
-                {
-                    "source": job_definition["source"],
-                    "interval_seconds": job_definition["interval_seconds"],
-                }
-            ),
-        },
-    )
-    return int(job_id)
-
-
-def mark_job(session, job_id: int, status: str, error_message: str | None = None, items_found: int | None = None) -> None:
-    updated_at = utc_now_naive()
-    values = {
-        "status": status,
-        "error_message": error_message,
-        "updated_at": updated_at,
-        "finished_at": updated_at if status in TERMINAL_JOB_STATUSES else None,
-        "job_id": job_id,
-    }
-    if items_found is None:
-        session.execute(
-            text(
-                """
-                update jobs
-                set status = :status, error_message = :error_message, finished_at = :finished_at, updated_at = :updated_at
-                where id = :job_id
-                """
-            ),
-            values,
-        )
-    else:
-        values["items_found"] = items_found
-        session.execute(
-            text(
-                """
-                update jobs
-                set status = :status, error_message = :error_message, items_found = :items_found,
-                    finished_at = now(), updated_at = :updated_at
-                where id = :job_id
-                """
-            ),
-            values,
-        )
-
-
-def start_job_attempt(session, job_id: int) -> int:
-    return int(
-        session.execute(
-            text(
-                """
-                update jobs
-                set status = 'running', attempts = attempts + 1, started_at = coalesce(started_at, now()),
-                    finished_at = null, updated_at = now()
-                where id = :job_id
-                returning attempts
-                """
-            ),
-            {"job_id": job_id},
-        ).scalar_one()
-    )
-
-
-def replace_job_items(session, job_id: int, records) -> int:
-    rows = build_scraped_item_rows(job_id, records)
-    session.execute(text("delete from scraped_items where job_id = :job_id"), {"job_id": job_id})
-    for row in rows:
-        session.execute(
-            text(
-                """
-                insert into scraped_items (job_id, external_id, title, detail_url, raw_data, created_at)
-                values (:job_id, :external_id, :title, :detail_url, cast(:raw_data as jsonb), :extracted_at)
-                """
-            ),
-            row,
-        )
-    return len(rows)
-
-
-def handle_retryable_failure(self, session, job_id: int, outcome: str, message: str, exc: Exception) -> dict:
-    attempt = get_job_attempt(session, job_id)
-    next_status = status_after_retryable_failure(outcome, attempt, settings.scraper_max_attempts)
-    if next_status == "retrying":
-        countdown = retry_countdown_seconds(attempt)
-        mark_job(session, job_id, "retrying", error_message=message)
-        add_event(
-            session,
-            job_id,
-            "job_retry_scheduled",
-            f"Retry agendado em {countdown}s apos {outcome}",
-            {
-                "attempt": attempt,
-                "max_attempts": settings.scraper_max_attempts,
-                "countdown_seconds": countdown,
-                "outcome": outcome,
-            },
-        )
-        maybe_open_source_circuit(session, job_id, outcome)
-        session.commit()
-        raise self.retry(
-            exc=exc,
-            countdown=countdown,
-            max_retries=max(0, settings.scraper_max_attempts - 1),
-            queue="scrape.retry",
-        )
-
-    mark_job(session, job_id, next_status, error_message=message)
-    add_event(
-        session,
-        job_id,
-        "job_dead_lettered",
-        f"Job enviado para DLQ apos {attempt} tentativa(s): {outcome}",
-        {"attempt": attempt, "max_attempts": settings.scraper_max_attempts, "outcome": outcome},
-    )
-    maybe_open_source_circuit(session, job_id, outcome)
-    session.commit()
-    SCRAPE_JOBS_FAILED.inc()
-    SCRAPE_JOBS_DEAD_LETTER.inc()
-    celery_app.send_task(
-        DEAD_LETTER_TASK,
-        kwargs={
-            "payload": {
-                "job_id": job_id,
-                "outcome": outcome,
-                "attempt": attempt,
-                "message": message,
-            }
-        },
-        queue="scrape.dead_letter",
-    )
-    return {"status": next_status, "outcome": outcome, "attempt": attempt}
-
-
-def get_job_attempt(session, job_id: int) -> int:
-    return int(
-        session.execute(
-            text("select attempts from jobs where id = :job_id"),
-            {"job_id": job_id},
-        ).scalar_one()
-    )
-
-
-def refresh_source_circuit(session, source_id: int, status: str, circuit_open_until: datetime | None):
-    state = normalize_source_circuit(status, circuit_open_until)
-    if state.closed_after_expiry:
-        session.execute(
-            text(
-                """
-                update sources
-                set status = 'active', circuit_open_until = null, updated_at = now()
-                where id = :source_id
-                """
-            ),
-            {"source_id": source_id},
-        )
-    return state
-
-
-def source_unavailable_message(source_name: str, status: str, circuit_open_until: datetime | None) -> str:
-    if status == CIRCUIT_OPEN_SOURCE_STATUS:
-        until = circuit_open_until.isoformat() if circuit_open_until else "indefinido"
-        return f"Fonte {source_name} com circuito aberto ate {until}"
-    return f"Fonte {source_name} indisponivel para execucao: {status}"
-
-
-def maybe_open_source_circuit(session, job_id: int, outcome: str) -> None:
-    source = session.execute(
-        text(
-            """
-            select s.id, s.name, s.status, s.circuit_open_until
-            from sources s
-            join jobs j on j.source_id = s.id
-            where j.id = :job_id
-            """
-        ),
-        {"job_id": job_id},
-    ).mappings().one()
-    if source["status"] not in {ACTIVE_SOURCE_STATUS, CIRCUIT_OPEN_SOURCE_STATUS}:
-        return
-
-    recent_outcomes = recent_source_failure_outcomes(
-        session,
-        job_id,
-        limit=settings.source_circuit_failure_threshold,
-    )
-    if not should_open_source_circuit(recent_outcomes, settings.source_circuit_failure_threshold):
-        return
-
-    deadline = next_source_circuit_deadline(settings.source_circuit_cooldown_seconds)
-    session.execute(
-        text(
-            """
-            update sources
-            set status = 'circuit_open', circuit_open_until = :circuit_open_until, updated_at = now()
-            where id = :source_id
-            """
-        ),
-        {"source_id": source["id"], "circuit_open_until": deadline},
-    )
-    add_event(
-        session,
-        job_id,
-        "source_circuit_opened",
-        (
-            f"Circuito da fonte {source['name']} aberto por "
-            f"{settings.source_circuit_cooldown_seconds}s apos falhas consecutivas"
-        ),
-        {
-            "source": source["name"],
-            "outcome": outcome,
-            "recent_outcomes": recent_outcomes,
-            "failure_threshold": settings.source_circuit_failure_threshold,
-            "circuit_open_until": deadline.isoformat(),
-        },
-    )
-
-
-def recent_source_failure_outcomes(session, job_id: int, limit: int) -> list[str]:
-    rows = session.execute(
-        text(
-            """
-            select case
-                     when e.event_type = 'job_success' then 'success'
-                     else e.metadata->>'outcome'
-                   end as outcome
-            from job_events e
-            join jobs event_job on event_job.id = e.job_id
-            join jobs current_job on current_job.source_id = event_job.source_id
-            where current_job.id = :job_id
-              and e.event_type in ('job_retry_scheduled', 'job_dead_lettered', 'job_success')
-            order by e.created_at desc
-            limit :limit
-            """
-        ),
-        {"job_id": job_id, "limit": max(1, limit)},
-    )
-    return [row.outcome for row in rows if row.outcome]
-
-
-def add_event(session, job_id: int, event_type: str, message: str, metadata: dict | None = None) -> None:
-    session.execute(
-        text(
-            """
-            insert into job_events (job_id, event_type, message, metadata, created_at)
-            values (:job_id, :event_type, :message, cast(:metadata as jsonb), now())
-            """
-        ),
-        {
-            "job_id": job_id,
-            "event_type": event_type,
-            "message": message,
-            "metadata": json.dumps(metadata or {}, ensure_ascii=False),
-        },
-    )
-
-
-def sync_proxy_manager_from_db(session) -> None:
-    if not settings.enable_proxy_rotation:
-        return
-    rows = session.execute(
-        text(
-            """
-            select name, status, current_active_jobs, max_concurrent_jobs,
-                   blocked_count, rate_limited_count, cooldown_until
-            from proxy_profiles
-            order by name
-            """
-        )
-    ).mappings().all()
-    proxy_manager.sync(proxy_states_from_rows(rows))
-
-
-def persist_proxy_state(session, proxy: ProxyProfileState) -> None:
-    if not settings.enable_proxy_rotation or proxy.name == "direct":
-        return
-    session.execute(
-        text(
-            """
-            update proxy_profiles
-            set status = :status,
-                current_active_jobs = :current_active_jobs,
-                blocked_count = :blocked_count,
-                rate_limited_count = :rate_limited_count,
-                cooldown_until = :cooldown_until,
-                updated_at = now()
-            where name = :name
-            """
-        ),
-        {
-            "name": proxy.name,
-            "status": proxy.status,
-            "current_active_jobs": proxy.current_active_jobs,
-            "blocked_count": proxy.blocked_count,
-            "rate_limited_count": proxy.rate_limited_count,
-            "cooldown_until": proxy.cooldown_until,
-        },
-    )
-

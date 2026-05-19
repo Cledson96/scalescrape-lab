@@ -198,6 +198,25 @@ class WorkerRuntimeConfigTests(unittest.TestCase):
         self.assertIn("worker_init.connect", celery_app)
         self.assertNotIn("\nstart_http_server(9100)", celery_app)
 
+    def test_job_runtime_is_split_by_responsibility(self) -> None:
+        jobs_path = ROOT / "apps" / "worker" / "app" / "jobs"
+        expected_files = [
+            "events.py",
+            "proxy_state.py",
+            "repository.py",
+            "retry.py",
+            "runtime.py",
+            "source_circuit.py",
+            "tasks.py",
+        ]
+        missing = [filename for filename in expected_files if not (jobs_path / filename).exists()]
+        tasks_py = (jobs_path / "tasks.py").read_text(encoding="utf-8")
+
+        self.assertEqual(missing, [])
+        self.assertLess(len(tasks_py), 10000)
+        self.assertNotIn("from sqlalchemy", tasks_py)
+        self.assertNotIn("session.execute(", tasks_py)
+
 
 class WorkerSettingsTests(unittest.TestCase):
     def test_promised_worker_flags_are_loaded_from_env(self) -> None:

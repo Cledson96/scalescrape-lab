@@ -1,6 +1,6 @@
 """Script standalone para diagnosticar bloqueios da fonte Betano.
 
-Execucao: docker compose run --rm worker python test_betano.py
+Execucao: docker compose run --rm worker python tools/diagnostics/test_betano.py
 """
 
 import asyncio

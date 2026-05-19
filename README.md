@@ -406,7 +406,7 @@ mudanca de markup.
 Para diagnosticar a fonte manualmente no mesmo ambiente do worker:
 
 ```bash
-docker compose run --rm -e BETANO_PROXY_URL=socks5://100.64.0.10:1080 worker python test_betano.py
+docker compose run --rm -e BETANO_PROXY_URL=socks5://100.64.0.10:1080 worker python tools/diagnostics/test_betano.py
 ```
 
 O script imprime o IP de saida do navegador, testa homepage e URLs de futebol,

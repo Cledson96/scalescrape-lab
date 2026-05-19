@@ -28,6 +28,7 @@ from app.globo import (
 from app.metrics import CAPTCHA_DETECTED, CAPTCHA_SOLVE_DURATION, CAPTCHA_SOLVED
 from app.policy import host_from_url
 from app.proxy.manager import ProxyProfileState
+from app.free_proxy import get_free_working_proxy
 
 
 BETANO_HOST = "www.betano.bet.br"
@@ -78,6 +79,9 @@ async def scrape_with_playwright(
             # Betano has bot detection — stealth browser + cookie session persistence
             session_path = str(Path(media_root) / "betano_session.json")
             storage_state = session_path if Path(session_path).exists() else None
+
+            if betano_proxy_url == "auto":
+                betano_proxy_url = await get_free_working_proxy()
 
             betano_browser = await playwright.chromium.launch(
                 headless=True,

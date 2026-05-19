@@ -36,10 +36,10 @@ A API FastAPI recebe `POST /jobs` com uma URL inicial:
 ```
 
 Ela valida a fonte, cria um registro em `jobs`, grava um evento `job_created` e
-publica a tarefa `app.tasks.run_scrape_job` na fila `scrape.jobs`.
+publica a tarefa `app.jobs.tasks.run_scrape_job` na fila `scrape.jobs`.
 
 Tambem existe o fluxo automatico: o servico `scheduler`, rodando Celery Beat,
-dispara `app.tasks.enqueue_scheduled_scrape_jobs` a cada 21600 segundos
+dispara `app.jobs.tasks.enqueue_scheduled_scrape_jobs` a cada 21600 segundos
 (6 horas). Essa tarefa cria tres jobs:
 
 - target protegido do laboratorio;

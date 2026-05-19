@@ -2,6 +2,7 @@ from celery import Celery
 from kombu import Queue
 from prometheus_client import start_http_server
 
+from app.jobs.task_names import DEAD_LETTER_TASK, ENQUEUE_SCHEDULED_TASK, RUN_SCRAPE_TASK
 from app.settings import settings
 
 start_http_server(9100)
@@ -16,9 +17,9 @@ celery_app.conf.task_queues = (
     Queue("scrape.dead_letter"),
 )
 celery_app.conf.task_routes = {
-    "app.tasks.run_scrape_job": {"queue": "scrape.jobs"},
-    "app.tasks.dead_letter_scrape_job": {"queue": "scrape.dead_letter"},
-    "app.tasks.enqueue_scheduled_scrape_jobs": {"queue": "scrape.jobs"},
+    RUN_SCRAPE_TASK: {"queue": "scrape.jobs"},
+    DEAD_LETTER_TASK: {"queue": "scrape.dead_letter"},
+    ENQUEUE_SCHEDULED_TASK: {"queue": "scrape.jobs"},
 }
 celery_app.conf.timezone = "UTC"
 celery_app.conf.beat_schedule = {}
@@ -30,6 +31,6 @@ celery_app.conf.task_time_limit = settings.scraper_job_timeout_seconds
 
 if settings.enable_scheduled_scraping:
     celery_app.conf.beat_schedule["scheduled-demo-scrapes-every-six-hours"] = {
-        "task": "app.tasks.enqueue_scheduled_scrape_jobs",
+        "task": ENQUEUE_SCHEDULED_TASK,
         "schedule": settings.scheduled_scrape_interval_seconds,
     }

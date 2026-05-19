@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from app.captcha.mock_provider import MockCaptchaResolverProvider
 from app.captcha.two_captcha_provider import TwoCaptchaConfig, TwoCaptchaImageResolverProvider
 from app.jobs.celery_app import celery_app
+from app.jobs.task_names import DEAD_LETTER_TASK, ENQUEUE_SCHEDULED_TASK, RUN_SCRAPE_TASK
 from app.observability.metrics import (
     PROXY_ACTIVE_JOBS,
     PROXY_SELECTED,
@@ -55,7 +56,7 @@ def make_captcha_provider():
     return MockCaptchaResolverProvider()
 
 
-@celery_app.task(name="app.tasks.enqueue_scheduled_scrape_jobs")
+@celery_app.task(name=ENQUEUE_SCHEDULED_TASK)
 def enqueue_scheduled_scrape_jobs() -> dict:
     session = SessionLocal()
     scheduled_jobs = scheduled_scrape_jobs(
@@ -79,7 +80,7 @@ def enqueue_scheduled_scrape_jobs() -> dict:
         session.commit()
 
         for job in created_jobs:
-            celery_app.send_task("app.tasks.run_scrape_job", args=[job["job_id"]], queue="scrape.jobs")
+            celery_app.send_task(RUN_SCRAPE_TASK, args=[job["job_id"]], queue="scrape.jobs")
 
         return {"status": "scheduled", "jobs": created_jobs, "skipped_sources": skipped_sources}
     except Exception:
@@ -90,7 +91,7 @@ def enqueue_scheduled_scrape_jobs() -> dict:
 
 
 @celery_app.task(
-    name="app.tasks.run_scrape_job",
+    name=RUN_SCRAPE_TASK,
     bind=True,
     max_retries=max(0, settings.scraper_max_attempts - 1),
     soft_time_limit=max(1, settings.scraper_job_timeout_seconds - 10),
@@ -227,7 +228,7 @@ def run_scrape_job(self, job_id: int) -> dict:
         session.close()
 
 
-@celery_app.task(name="app.tasks.dead_letter_scrape_job")
+@celery_app.task(name=DEAD_LETTER_TASK)
 def dead_letter_scrape_job(payload: dict) -> dict:
     return payload
 
@@ -401,7 +402,7 @@ def handle_retryable_failure(self, session, job_id: int, outcome: str, message: 
     SCRAPE_JOBS_FAILED.inc()
     SCRAPE_JOBS_DEAD_LETTER.inc()
     celery_app.send_task(
-        "app.tasks.dead_letter_scrape_job",
+        DEAD_LETTER_TASK,
         kwargs={
             "payload": {
                 "job_id": job_id,

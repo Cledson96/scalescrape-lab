@@ -48,6 +48,12 @@ worker_proxy = load_module("worker_proxy", ROOT / "apps" / "worker" / "app" / "p
 api_dto = load_module("api_dto", ROOT / "apps" / "api" / "app" / "schemas" / "dto.py")
 sys.path.insert(0, str(ROOT / "apps" / "worker"))
 from app.policy import PolicyError as AppPolicyError  # noqa: E402
+from app.retry_policy import (  # noqa: E402
+    normalized_max_attempts,
+    retry_countdown_seconds,
+    should_retry_outcome,
+    status_after_retryable_failure,
+)
 from app.captcha.two_captcha_provider import (  # noqa: E402
     TwoCaptchaConfig,
     TwoCaptchaImageResolverProvider,
@@ -120,6 +126,28 @@ class ProxyManagerTests(unittest.TestCase):
         manager.release("proxy-a", "rate_limited")
         self.assertEqual(proxy.status, "cooldown")
         self.assertIsNotNone(proxy.cooldown_until)
+
+
+class WorkerRetryPolicyTests(unittest.TestCase):
+    def test_retry_countdown_uses_exponential_backoff_with_cap(self) -> None:
+        self.assertEqual(retry_countdown_seconds(1, jitter_seconds=0), 30)
+        self.assertEqual(retry_countdown_seconds(2, jitter_seconds=0), 60)
+        self.assertEqual(retry_countdown_seconds(6, jitter_seconds=0), 300)
+
+    def test_retry_policy_sends_exhausted_attempt_to_dlq_path(self) -> None:
+        self.assertTrue(should_retry_outcome("failed", attempt=2, max_attempts=3))
+        self.assertFalse(should_retry_outcome("failed", attempt=3, max_attempts=3))
+        self.assertEqual(status_after_retryable_failure("failed", attempt=3, max_attempts=3), "dead_lettered")
+
+    def test_policy_errors_are_not_retryable(self) -> None:
+        self.assertFalse(should_retry_outcome("blocked_by_policy", attempt=1, max_attempts=3))
+        self.assertEqual(
+            status_after_retryable_failure("blocked_by_policy", attempt=1, max_attempts=3),
+            "blocked_by_policy",
+        )
+
+    def test_max_attempts_never_goes_below_one(self) -> None:
+        self.assertEqual(normalized_max_attempts(0), 1)
 
 
 class WorkerCaptchaPolicyTests(unittest.TestCase):

@@ -248,7 +248,8 @@ proprio projeto ou ambientes explicitamente autorizados.
 6. Com acesso liberado, o worker extrai `.item-card`, `.item-title` e
    `.detail-link`.
 7. Os itens sao gravados em `scraped_items`; o job passa para `success`,
-   `failed`, `blocked`, `rate_limited` ou `blocked_by_policy`.
+   `retrying`, `dead_lettered`, `failed`, `blocked`, `rate_limited` ou
+   `blocked_by_policy` conforme tentativas, timeout e resultado da coleta.
 
 Para Books to Scrape, o worker usa o layout `article.product_pod`, abre cada
 pagina de detalhe do livro, le `#product_description + p` e grava os campos

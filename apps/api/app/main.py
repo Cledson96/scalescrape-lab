@@ -301,6 +301,7 @@ def retry_job(job_id: int, session: Session = Depends(get_session)) -> Job:
     if job is None:
         raise HTTPException(status_code=404, detail="job_not_found")
     job.status = "pending"
+    job.attempts = 0
     job.error_message = None
     job.finished_at = None
     session.add(

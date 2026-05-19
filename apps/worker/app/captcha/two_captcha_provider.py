@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from app.captcha.base import CaptchaResolverProvider
-from app.policy import ensure_host_allowed
+from app.resilience.host_policy import ensure_host_allowed
 
 
 @dataclass

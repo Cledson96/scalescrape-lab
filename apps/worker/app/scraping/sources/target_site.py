@@ -3,9 +3,9 @@ from __future__ import annotations
 from urllib.parse import urljoin
 
 from app.captcha.base import CaptchaResolverProvider
-from app.login_captcha import handle_login_if_present, solve_local_challenge
+from app.scraping.runtime.login_captcha import handle_login_if_present, solve_local_challenge
 from app.proxy.manager import ProxyProfileState
-from app.scraper_contracts import LoginCredentials, ScrapedRecord, ScrapeBlocked
+from app.scraping.contracts import LoginCredentials, ScrapedRecord, ScrapeBlocked
 
 
 async def scrape_target_site(

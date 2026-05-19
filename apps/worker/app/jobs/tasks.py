@@ -9,8 +9,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.captcha.mock_provider import MockCaptchaResolverProvider
 from app.captcha.two_captcha_provider import TwoCaptchaConfig, TwoCaptchaImageResolverProvider
-from app.celery_app import celery_app
-from app.metrics import (
+from app.jobs.celery_app import celery_app
+from app.observability.metrics import (
     PROXY_ACTIVE_JOBS,
     PROXY_SELECTED,
     SCRAPE_ITEMS,
@@ -19,15 +19,16 @@ from app.metrics import (
     SCRAPE_JOBS_FAILED,
     SCRAPE_JOBS_SUCCESS,
 )
-from app.item_persistence import build_scraped_item_rows
-from app.policy import PolicyError
+from app.jobs.item_persistence import build_scraped_item_rows
+from app.resilience.host_policy import PolicyError
 from app.proxy.manager import default_proxy_manager
 from app.proxy.policy import ensure_proxy_allowed
-from app.retry_policy import retry_countdown_seconds, status_after_retryable_failure
-from app.schedule import scheduled_scrape_jobs
-from app.scraper import LoginCredentials, ScrapeBlocked, scrape_with_playwright
+from app.resilience.retry_policy import retry_countdown_seconds, status_after_retryable_failure
+from app.jobs.schedule import scheduled_scrape_jobs
+from app.scraping.contracts import LoginCredentials, ScrapeBlocked
+from app.scraping.orchestrator import scrape_with_playwright
 from app.settings import settings
-from app.source_circuit import (
+from app.resilience.source_circuit import (
     ACTIVE_SOURCE_STATUS,
     CIRCUIT_OPEN_SOURCE_STATUS,
     next_source_circuit_deadline,

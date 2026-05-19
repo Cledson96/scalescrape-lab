@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from urllib.parse import urljoin
 
-from app.books import build_books_record_payload, extract_book_external_id, extract_books_category
+from app.scraping.sources.books_parser import build_books_record_payload, extract_book_external_id, extract_books_category
 from app.proxy.manager import ProxyProfileState
-from app.scraper_contracts import ScrapedRecord, ScrapeBlocked
+from app.scraping.contracts import ScrapedRecord, ScrapeBlocked
 
 
 BOOKS_TO_SCRAPE_HOST = "books.toscrape.com"

@@ -5,10 +5,10 @@ from urllib.parse import urljoin
 import asyncio
 
 from app.captcha.base import CaptchaResolverProvider
-from app.metrics import CAPTCHA_DETECTED, CAPTCHA_SOLVE_DURATION, CAPTCHA_SOLVED
-from app.policy import host_from_url
+from app.observability.metrics import CAPTCHA_DETECTED, CAPTCHA_SOLVE_DURATION, CAPTCHA_SOLVED
+from app.resilience.host_policy import host_from_url
 from app.proxy.manager import ProxyProfileState
-from app.scraper_contracts import LoginCredentials
+from app.scraping.contracts import LoginCredentials
 
 
 async def handle_login_if_present(

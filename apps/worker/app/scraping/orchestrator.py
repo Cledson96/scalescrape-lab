@@ -2,48 +2,17 @@ from __future__ import annotations
 
 import logging
 
-from app.betano_scraper import (
-    BETANO_FOOTBALL_TODAY_API_PATH,
-    BETANO_HOST,
-    _betano_api_match_datetime,
-    _betano_api_result_market,
-    _betano_api_selection_price,
-    _betano_api_teams,
-    _betano_football_today_api_url,
-    _betano_visible_odd_buttons,
-    _build_betano_api_records,
-    _build_match_from_odds_group,
-    _click_betano_football_from_homepage,
-    _close_betano_landing_modal,
-    _count_betano_visible_odds,
-    _extract_betano_visible_matches,
-    _scrape_betano_football_api,
-    _accept_betano_age_verification,
-    _browser_paced_click,
-    _reset_betano_browser_state,
-    scrape_betano_football,
-)
-from app.books_scraper import BOOKS_TO_SCRAPE_HOST, read_book_description, scrape_books_to_scrape
-from app.browser_profile import launch_betano_browser_context, read_browser_egress_ip
+from app.scraping.sources.betano import BETANO_HOST, scrape_betano_football
+from app.scraping.sources.books import BOOKS_TO_SCRAPE_HOST, scrape_books_to_scrape
+from app.scraping.runtime.browser_profile import launch_betano_browser_context, read_browser_egress_ip
 from app.captcha.base import CaptchaResolverProvider
-from app.debug_artifacts import (
-    BetanoDebugArtifactPaths,
-    _cleanup_betano_debug_artifacts,
-    _message_with_debug_url,
-    betano_block_message,
-    betano_debug_artifact_paths,
-    betano_no_league_tabs_message,
-    mask_proxy_url,
-    maybe_save_betano_debug_artifacts,
-    save_betano_debug_artifacts,
-)
-from app.free_proxy import get_free_working_proxy
-from app.globo_scraper import GLOBO_HOME_HOST, download_globo_image, scrape_globo_home
-from app.login_captcha import handle_login_if_present, solve_local_challenge
-from app.policy import host_from_url
+from app.scraping.runtime.debug_artifacts import mask_proxy_url
+from app.proxy.free_proxy import get_free_working_proxy
+from app.scraping.sources.globo import GLOBO_HOME_HOST, scrape_globo_home
+from app.resilience.host_policy import host_from_url
 from app.proxy.manager import ProxyProfileState
-from app.scraper_contracts import LoginCredentials, ScrapedRecord, ScrapeBlocked
-from app.target_site_scraper import scrape_target_site
+from app.scraping.contracts import LoginCredentials, ScrapedRecord
+from app.scraping.sources.target_site import scrape_target_site
 
 
 logger = logging.getLogger(__name__)

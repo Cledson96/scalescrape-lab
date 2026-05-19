@@ -8,19 +8,19 @@ import logging
 import random
 import re
 
-from app.betano import (
+from app.scraping.sources.betano_parser import (
     build_betano_record_payload,
     extract_betano_external_id,
     parse_betano_match_datetime,
 )
-from app.debug_artifacts import (
+from app.scraping.runtime.debug_artifacts import (
     _message_with_debug_url,
     betano_block_message,
     betano_no_league_tabs_message,
     maybe_save_betano_debug_artifacts,
 )
 from app.proxy.manager import ProxyProfileState
-from app.scraper_contracts import ScrapedRecord, ScrapeBlocked
+from app.scraping.contracts import ScrapedRecord, ScrapeBlocked
 
 
 BETANO_HOST = "www.betano.bet.br"

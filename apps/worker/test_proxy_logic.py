@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from app.free_proxy import get_free_working_proxy
+from app.proxy.free_proxy import get_free_working_proxy
 
 logging.basicConfig(level=logging.INFO)
 

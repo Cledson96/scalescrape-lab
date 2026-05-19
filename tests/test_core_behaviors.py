@@ -43,19 +43,22 @@ def load_module(name: str, path: Path):
     return module
 
 
-worker_policy = load_module("worker_policy", ROOT / "apps" / "worker" / "app" / "policy.py")
+worker_policy = load_module(
+    "worker_policy",
+    ROOT / "apps" / "worker" / "app" / "resilience" / "host_policy.py",
+)
 worker_proxy = load_module("worker_proxy", ROOT / "apps" / "worker" / "app" / "proxy" / "manager.py")
 api_dto = load_module("api_dto", ROOT / "apps" / "api" / "app" / "schemas" / "dto.py")
 sys.path.insert(0, str(ROOT / "apps" / "worker"))
-from app.policy import PolicyError as AppPolicyError  # noqa: E402
-from app.item_persistence import build_scraped_item_rows  # noqa: E402
-from app.retry_policy import (  # noqa: E402
+from app.resilience.host_policy import PolicyError as AppPolicyError  # noqa: E402
+from app.jobs.item_persistence import build_scraped_item_rows  # noqa: E402
+from app.resilience.retry_policy import (  # noqa: E402
     normalized_max_attempts,
     retry_countdown_seconds,
     should_retry_outcome,
     status_after_retryable_failure,
 )
-from app.source_circuit import (  # noqa: E402
+from app.resilience.source_circuit import (  # noqa: E402
     CIRCUIT_OPEN_SOURCE_STATUS,
     normalize_source_circuit,
     next_source_circuit_deadline,
@@ -66,29 +69,31 @@ from app.captcha.two_captcha_provider import (  # noqa: E402
     TwoCaptchaConfig,
     TwoCaptchaImageResolverProvider,
 )
-from app.books import (  # noqa: E402
+from app.scraping.sources.books_parser import (  # noqa: E402
     build_books_record_payload,
     extract_book_external_id,
     parse_books_price,
     parse_rating_class,
 )
-from app.globo import (  # noqa: E402
+from app.scraping.sources.globo_parser import (  # noqa: E402
     build_globo_record_payload,
     extract_globo_external_id,
     is_allowed_globo_image_url,
     parse_globo_article_detail,
     parse_globo_home_cards,
 )
-from app.schedule import scheduled_scrape_jobs  # noqa: E402
-from app.scraper import (  # noqa: E402
-    _build_betano_api_records,
-    betano_debug_artifact_paths,
-    LoginCredentials,
+from app.scraping.contracts import LoginCredentials  # noqa: E402
+from app.scraping.runtime.debug_artifacts import (  # noqa: E402
     betano_block_message,
+    betano_debug_artifact_paths,
     betano_no_league_tabs_message,
-    handle_login_if_present,
     mask_proxy_url,
 )
+from app.scraping.runtime.login_captcha import handle_login_if_present  # noqa: E402
+from app.scraping.sources.betano import (  # noqa: E402
+    _build_betano_api_records,
+)
+from app.jobs.schedule import scheduled_scrape_jobs  # noqa: E402
 
 PolicyError = worker_policy.PolicyError
 ensure_host_allowed = worker_policy.ensure_host_allowed

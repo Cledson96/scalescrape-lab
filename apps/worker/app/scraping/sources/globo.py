@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.globo import (
+from app.scraping.sources.globo_parser import (
     build_globo_record_payload,
     extract_globo_external_id,
     globo_image_paths,
@@ -11,7 +11,7 @@ from app.globo import (
     parse_globo_home_cards,
 )
 from app.proxy.manager import ProxyProfileState
-from app.scraper_contracts import ScrapedRecord, ScrapeBlocked
+from app.scraping.contracts import ScrapedRecord, ScrapeBlocked
 
 
 GLOBO_HOME_HOST = "www.globo.com"

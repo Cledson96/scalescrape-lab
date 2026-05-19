@@ -1,4 +1,4 @@
-from app.policy import ensure_host_allowed
+from app.resilience.host_policy import ensure_host_allowed
 
 
 def ensure_proxy_allowed(target_url: str, allowed_hosts: set[str]) -> str:

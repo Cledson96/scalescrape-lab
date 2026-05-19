@@ -213,6 +213,8 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
   assert.match(html, /Consultar Globo agora/);
   assert.match(html, /Consultar Betano agora/);
   assert.match(html, /Consultar todos agora/);
+  assert.match(html, /Abrir Swagger da API/);
+  assert.match(html, /href="http:\/\/localhost:8000\/docs"/);
   assert.match(html, /href="\/dashboard\?tab=fake&amp;betanoPage=2"/);
   assert.match(html, /href="\/dashboard\?tab=books&amp;betanoPage=2"/);
   assert.match(html, /href="\/dashboard\?tab=globo&amp;betanoPage=2"/);

@@ -75,6 +75,10 @@ export function getApiBaseUrl(): string {
   return (process.env.SCALESCRAPE_API_URL || "http://api:8000").replace(/\/$/, "");
 }
 
+export function getPublicApiBaseUrl(): string {
+  return (process.env.PUBLIC_API_URL || process.env.SCALESCRAPE_API_URL || "http://localhost:8000").replace(/\/$/, "");
+}
+
 const emptyPage = (page = 1): PaginatedItems => ({
   items: [],
   total: 0,

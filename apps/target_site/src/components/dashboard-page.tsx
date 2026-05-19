@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 
-import type { DashboardData, ExtractedItem, JobSummary, PaginatedItems } from "../lib/dashboard-api";
+import { getPublicApiBaseUrl, type DashboardData, type ExtractedItem, type JobSummary, type PaginatedItems } from "../lib/dashboard-api";
 
 type DashboardPageProps = DashboardData & {
   activeTab?: DashboardTab;
@@ -438,6 +438,7 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
   const pages = { fakeItems, booksItems, globoItems, betanoItems };
   const visibleItems = fakeItems.total + booksItems.total + globoItems.total + betanoItems.total || items.length;
   const successRate = jobs.length > 0 ? `${Math.round((successCount / jobs.length) * 100)}%` : "0%";
+  const swaggerUrl = `${getPublicApiBaseUrl()}/docs`;
 
   return (
     <>
@@ -491,6 +492,10 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
             <a className="secondary-dashboard-action" href="/dashboard">
               <strong>Atualizar painel</strong>
               <span>Recarregar status</span>
+            </a>
+            <a className="secondary-dashboard-action" href={swaggerUrl} target="_blank" rel="noreferrer">
+              <strong>Abrir Swagger da API</strong>
+              <span>Ver rotas, exemplos e schemas detalhados</span>
             </a>
           </div>
         </section>

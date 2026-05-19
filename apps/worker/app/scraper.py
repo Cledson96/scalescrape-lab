@@ -76,6 +76,13 @@ def betano_block_message(status_code: int, proxy_url: str | None, egress_ip: str
     return f"bloqueio HTTP {status_code} no Betano ({', '.join(details)})"
 
 
+def betano_no_league_tabs_message(clickable_count: int, odds_count: int, current_url: str) -> str:
+    return (
+        "Nenhuma aba de liga encontrada na secao POPULARES do Betano "
+        f"(clickables={clickable_count}, odds={odds_count}, url={current_url})"
+    )
+
+
 async def read_browser_egress_ip(page, proxy_url: str | None) -> str | None:  # noqa: ANN001
     if not proxy_url:
         return None
@@ -532,7 +539,6 @@ async def scrape_betano_football(
     Uses human-like interactions and persists session cookies between runs.
     """
     import random
-    import re
     from datetime import datetime, timezone
 
     football_url = start_url
@@ -620,7 +626,19 @@ async def scrape_betano_football(
 
     leagues_to_scrape = min(len(league_tabs), max_leagues)
     if leagues_to_scrape == 0:
-        raise RuntimeError("Nenhuma aba de liga encontrada na seção POPULARES do Betano")
+        extracted_at = datetime.now(timezone.utc).isoformat()
+        records = await _extract_betano_visible_matches(
+            page=page,
+            championship="Futebol - mercados populares",
+            market_type="Resultado da partida",
+            proxy=proxy,
+            extracted_at=extracted_at,
+        )
+        if records:
+            logger.info("Betano sem abas de liga; extraidos %s jogos da tela atual", len(records))
+            return records
+        visible_odds_count = await _count_betano_visible_odds(page)
+        raise RuntimeError(betano_no_league_tabs_message(clickable_count, visible_odds_count, page.url))
 
     for tab_el, championship in league_tabs[:leagues_to_scrape]:
         extracted_at = datetime.now(timezone.utc).isoformat()
@@ -633,69 +651,80 @@ async def scrape_betano_football(
 
             market_type = "Resultado da partida"
 
-            # Extract matches using the odds buttons as anchors.
-            # Betano odds buttons have aria-label like "Bet on 1 with odds 4.75."
-            # They appear as div[role="button"] or button elements.
-            odds_btns = page.locator(
-                '[aria-label*="Bet on"][aria-label*="odds"], '
-                '[aria-label*="apostar"][aria-label*="odds"], '
-                'div.selections__selection[role="button"]'
+            records.extend(
+                await _extract_betano_visible_matches(
+                    page=page,
+                    championship=championship,
+                    market_type=market_type,
+                    proxy=proxy,
+                    extracted_at=extracted_at,
+                )
             )
-            odds_count = await odds_btns.count()
-
-            if odds_count < 3:
-                # Fallback: try generic odds pattern via text
-                odds_btns = page.locator('[role="button"]')
-                fallback_odds = []
-                fc = await odds_btns.count()
-                for fi in range(fc):
-                    try:
-                        ft = (await odds_btns.nth(fi).inner_text(timeout=1000)).strip()
-                        if re.match(r'^\d+\.\d{2}$', ft):
-                            fallback_odds.append(odds_btns.nth(fi))
-                    except Exception:
-                        continue
-                if len(fallback_odds) >= 3:
-                    # Process in groups of 3
-                    for gi in range(0, len(fallback_odds) - 2, 3):
-                        try:
-                            record = await _build_match_from_odds_group(
-                                page=page,
-                                btn_home=fallback_odds[gi],
-                                btn_draw=fallback_odds[gi + 1],
-                                btn_away=fallback_odds[gi + 2],
-                                championship=championship,
-                                market_type=market_type,
-                                proxy=proxy,
-                                extracted_at=extracted_at,
-                            )
-                            if record:
-                                records.append(record)
-                        except Exception:
-                            continue
-                continue
-
-            # Group odds in sets of 3 (1/X/2)
-            for gi in range(0, odds_count - 2, 3):
-                try:
-                    record = await _build_match_from_odds_group(
-                        page=page,
-                        btn_home=odds_btns.nth(gi),
-                        btn_draw=odds_btns.nth(gi + 1),
-                        btn_away=odds_btns.nth(gi + 2),
-                        championship=championship,
-                        market_type=market_type,
-                        proxy=proxy,
-                        extracted_at=extracted_at,
-                    )
-                    if record:
-                        records.append(record)
-                except Exception:
-                    continue
 
         except Exception:
             continue
 
+    return records
+
+
+async def _count_betano_visible_odds(page) -> int:  # noqa: ANN001
+    buttons = await _betano_visible_odd_buttons(page)
+    return len(buttons)
+
+
+async def _betano_visible_odd_buttons(page) -> list:  # noqa: ANN001
+    import re
+
+    # Extract matches using odds buttons as anchors. Betano odds buttons may
+    # expose aria-labels, selection classes, or only plain numeric text.
+    odds_btns = page.locator(
+        '[aria-label*="Bet on"][aria-label*="odds"], '
+        '[aria-label*="apostar"][aria-label*="odds"], '
+        'div.selections__selection[role="button"]'
+    )
+    odds_count = await odds_btns.count()
+    if odds_count >= 3:
+        return [odds_btns.nth(index) for index in range(odds_count)]
+
+    fallback_odds = []
+    role_buttons = page.locator('[role="button"], button')
+    role_count = await role_buttons.count()
+    for index in range(role_count):
+        try:
+            text = (await role_buttons.nth(index).inner_text(timeout=1000)).strip()
+            if re.match(r'^\d+[.,]\d{2}$', text):
+                fallback_odds.append(role_buttons.nth(index))
+        except Exception:
+            continue
+    return fallback_odds
+
+
+async def _extract_betano_visible_matches(
+    *,
+    page,
+    championship: str,
+    market_type: str,
+    proxy: ProxyProfileState,
+    extracted_at: str,
+) -> list[ScrapedRecord]:
+    records: list[ScrapedRecord] = []
+    odds_buttons = await _betano_visible_odd_buttons(page)
+    for group_index in range(0, len(odds_buttons) - 2, 3):
+        try:
+            record = await _build_match_from_odds_group(
+                page=page,
+                btn_home=odds_buttons[group_index],
+                btn_draw=odds_buttons[group_index + 1],
+                btn_away=odds_buttons[group_index + 2],
+                championship=championship,
+                market_type=market_type,
+                proxy=proxy,
+                extracted_at=extracted_at,
+            )
+            if record:
+                records.append(record)
+        except Exception:
+            continue
     return records
 
 

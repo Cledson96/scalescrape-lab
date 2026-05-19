@@ -66,7 +66,13 @@ from app.globo import (  # noqa: E402
     parse_globo_home_cards,
 )
 from app.schedule import scheduled_scrape_jobs  # noqa: E402
-from app.scraper import LoginCredentials, betano_block_message, handle_login_if_present, mask_proxy_url  # noqa: E402
+from app.scraper import (  # noqa: E402
+    LoginCredentials,
+    betano_block_message,
+    betano_no_league_tabs_message,
+    handle_login_if_present,
+    mask_proxy_url,
+)
 
 PolicyError = worker_policy.PolicyError
 ensure_host_allowed = worker_policy.ensure_host_allowed
@@ -349,6 +355,15 @@ class BetanoDiagnosticsTests(unittest.TestCase):
         self.assertEqual(
             betano_block_message(403, "socks5://100.81.81.109:1080", "186.214.56.189"),
             "bloqueio HTTP 403 no Betano (proxy=socks5://100.81.81.109:1080, egress_ip=186.214.56.189)",
+        )
+
+    def test_betano_no_league_tabs_message_includes_page_diagnostics(self) -> None:
+        self.assertEqual(
+            betano_no_league_tabs_message(42, 9, "https://www.betano.bet.br/sport/futebol/"),
+            (
+                "Nenhuma aba de liga encontrada na secao POPULARES do Betano "
+                "(clickables=42, odds=9, url=https://www.betano.bet.br/sport/futebol/)"
+            ),
         )
 
 

@@ -19,6 +19,7 @@ from app.metrics import (
     SCRAPE_JOBS_FAILED,
     SCRAPE_JOBS_SUCCESS,
 )
+from app.item_persistence import build_scraped_item_rows
 from app.policy import PolicyError
 from app.proxy.manager import default_proxy_manager
 from app.proxy.policy import ensure_proxy_allowed
@@ -126,32 +127,20 @@ def run_scrape_job(self, job_id: int) -> dict:
                 betano_debug_max_artifacts=settings.betano_debug_max_artifacts,
             )
         )
-        for record in records:
-            extracted_at = datetime.utcnow()
-            raw_data = dict(record.raw_data)
-            raw_data.setdefault("extracted_at", extracted_at.isoformat())
-            session.execute(
-                text(
-                    """
-                    insert into scraped_items (job_id, external_id, title, detail_url, raw_data, created_at)
-                    values (:job_id, :external_id, :title, :detail_url, cast(:raw_data as jsonb), :extracted_at)
-                    """
-                ),
-                {
-                    "job_id": job_id,
-                    "external_id": record.external_id,
-                    "title": record.title,
-                    "detail_url": record.detail_url,
-                    "raw_data": json.dumps(raw_data, ensure_ascii=False),
-                    "extracted_at": extracted_at,
-                },
-            )
-        mark_job(session, job_id, "success", items_found=len(records))
-        add_event(session, job_id, "job_success", f"{len(records)} itens coletados")
+        items_persisted = replace_job_items(session, job_id, records)
+        mark_job(session, job_id, "success", items_found=items_persisted)
+        add_event(
+            session,
+            job_id,
+            "job_items_replaced",
+            f"{items_persisted} itens persistidos de forma idempotente",
+            {"items": items_persisted},
+        )
+        add_event(session, job_id, "job_success", f"{items_persisted} itens coletados")
         session.commit()
-        SCRAPE_ITEMS.inc(len(records))
+        SCRAPE_ITEMS.inc(items_persisted)
         SCRAPE_JOBS_SUCCESS.inc()
-        return {"status": "success", "items": len(records)}
+        return {"status": "success", "items": items_persisted}
     except ScrapeBlocked as exc:
         outcome = "rate_limited" if exc.status_code == 429 else "blocked"
         proxy_release_outcome = outcome
@@ -285,6 +274,22 @@ def start_job_attempt(session, job_id: int) -> int:
             {"job_id": job_id},
         ).scalar_one()
     )
+
+
+def replace_job_items(session, job_id: int, records) -> int:
+    rows = build_scraped_item_rows(job_id, records)
+    session.execute(text("delete from scraped_items where job_id = :job_id"), {"job_id": job_id})
+    for row in rows:
+        session.execute(
+            text(
+                """
+                insert into scraped_items (job_id, external_id, title, detail_url, raw_data, created_at)
+                values (:job_id, :external_id, :title, :detail_url, cast(:raw_data as jsonb), :extracted_at)
+                """
+            ),
+            row,
+        )
+    return len(rows)
 
 
 def handle_retryable_failure(self, session, job_id: int, outcome: str, message: str, exc: Exception) -> dict:

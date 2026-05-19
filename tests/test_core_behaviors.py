@@ -48,6 +48,7 @@ worker_proxy = load_module("worker_proxy", ROOT / "apps" / "worker" / "app" / "p
 api_dto = load_module("api_dto", ROOT / "apps" / "api" / "app" / "schemas" / "dto.py")
 sys.path.insert(0, str(ROOT / "apps" / "worker"))
 from app.policy import PolicyError as AppPolicyError  # noqa: E402
+from app.item_persistence import build_scraped_item_rows  # noqa: E402
 from app.retry_policy import (  # noqa: E402
     normalized_max_attempts,
     retry_countdown_seconds,
@@ -148,6 +149,27 @@ class WorkerRetryPolicyTests(unittest.TestCase):
 
     def test_max_attempts_never_goes_below_one(self) -> None:
         self.assertEqual(normalized_max_attempts(0), 1)
+
+
+class WorkerItemPersistenceTests(unittest.TestCase):
+    def test_build_scraped_item_rows_adds_job_and_extraction_metadata(self) -> None:
+        extracted_at = datetime(2026, 5, 19, 12, 30, 0)
+        record = types.SimpleNamespace(
+            external_id="item-1",
+            title="Item 1",
+            detail_url="https://example.test/item-1",
+            raw_data={"score": 91},
+        )
+
+        rows = build_scraped_item_rows(42, [record], extracted_at=extracted_at)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["job_id"], 42)
+        self.assertEqual(rows[0]["external_id"], "item-1")
+        self.assertEqual(rows[0]["extracted_at"], extracted_at)
+        self.assertIn('"score": 91', rows[0]["raw_data"])
+        self.assertIn('"extracted_at": "2026-05-19T12:30:00"', rows[0]["raw_data"])
+        self.assertNotIn("extracted_at", record.raw_data)
 
 
 class WorkerCaptchaPolicyTests(unittest.TestCase):

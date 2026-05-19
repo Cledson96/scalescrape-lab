@@ -10,8 +10,9 @@ controle de concorrencia, retry/backoff, DLQ, circuit breaker, politicas de
 seguranca, metricas e observabilidade. Tudo roda contra um target-site local do
 proprio projeto.
 
-Os itens extraidos sao persistidos no PostgreSQL em `scraped_items`, com
-`created_at` e `extracted_at` representando a data/hora da extracao. Imagens
+Os itens extraidos sao persistidos no PostgreSQL em `scraped_items` por lote
+idempotente de `job_id`, com `created_at` e `extracted_at` representando a
+data/hora da extracao. Imagens
 coletadas no scraper da Globo ficam em um volume Docker compartilhado e sao
 servidas pela API em `/media`.
 
@@ -247,7 +248,7 @@ proprio projeto ou ambientes explicitamente autorizados.
    bloquear.
 6. Com acesso liberado, o worker extrai `.item-card`, `.item-title` e
    `.detail-link`.
-7. Os itens sao gravados em `scraped_items`; o job passa para `success`,
+7. Os itens sao substituidos de forma idempotente em `scraped_items`; o job passa para `success`,
    `retrying`, `dead_lettered`, `failed`, `blocked`, `rate_limited` ou
    `blocked_by_policy` conforme tentativas, timeout e resultado da coleta.
 

@@ -1,3 +1,10 @@
+import {
+  EXTERNAL_RECORD_TOTAL,
+  LOCAL_RECORD_TOTAL,
+  PROTECTED_RECORD_TOTAL,
+  UNSTABLE_RECORD_TOTAL
+} from "./site-contracts";
+
 export type PublicRecord = {
   externalId: string;
   title: string;
@@ -183,10 +190,10 @@ export async function getExternalRecords(size = 500): Promise<PublicRecord[]> {
 
 export async function findRecord(recordId: string): Promise<PublicRecord | undefined> {
   const pools = [
-    getLocalRecords({ prefix: "normal", total: 240 }),
-    getLocalRecords({ prefix: "protected", total: 240 }),
-    getLocalRecords({ prefix: "unstable", total: 120 }),
-    await getExternalRecords(500)
+    getLocalRecords({ prefix: "normal", total: LOCAL_RECORD_TOTAL }),
+    getLocalRecords({ prefix: "protected", total: PROTECTED_RECORD_TOTAL }),
+    getLocalRecords({ prefix: "unstable", total: UNSTABLE_RECORD_TOTAL }),
+    await getExternalRecords(EXTERNAL_RECORD_TOTAL)
   ];
 
   return pools.flat().find((record) => record.externalId === recordId);

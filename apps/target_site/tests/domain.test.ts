@@ -10,7 +10,8 @@ import {
 } from "../src/lib/data";
 import { AntibotAction, AntibotSimulator } from "../src/lib/antibot";
 import { isPublicTargetPath, normalizeNextPath, validateLoginCredentials } from "../src/lib/auth";
-import { CaptchaStore, captchaStore } from "../src/lib/captcha";
+import { CaptchaStore } from "../src/lib/captcha";
+import { ANTI_BOT_RATE_LIMIT_VISITS } from "../src/lib/site-contracts";
 import { POST as submitLogin } from "../src/app/login/submit/route";
 
 test("local fake records are deterministic and large enough for scale demo", () => {
@@ -89,6 +90,24 @@ test("antibot simulator challenges suspicious high-volume sessions", () => {
   }
 
   assert.equal(action, AntibotAction.Challenge);
+});
+
+test("antibot simulator rate-limits excessive request volume", () => {
+  const simulator = new AntibotSimulator();
+  let action = AntibotAction.Allow;
+
+  for (let index = 0; index < ANTI_BOT_RATE_LIMIT_VISITS; index += 1) {
+    action = simulator.evaluate({
+      sessionId: "session-rate-limit",
+      proxyId: "proxy-a",
+      path: "/protected/items",
+      userAgent: "Mozilla/5.0",
+      hasClearanceCookie: true,
+      now: new Date(Date.UTC(2026, 0, 1, 10, 0, index))
+    }).action;
+  }
+
+  assert.equal(action, AntibotAction.RateLimit);
 });
 
 test("captcha store creates non-fixed answers by default", () => {

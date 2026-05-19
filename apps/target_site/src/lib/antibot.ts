@@ -1,3 +1,9 @@
+import {
+  ANTI_BOT_HIGH_VOLUME_VISITS,
+  ANTI_BOT_RATE_LIMIT_VISITS,
+  ANTI_BOT_VISIT_WINDOW_MS
+} from "./site-contracts";
+
 export enum AntibotAction {
   Allow = "allow",
   Delay = "delay",
@@ -44,7 +50,7 @@ export class AntibotSimulator {
   evaluate(input: EvaluateInput): AntibotDecision {
     const currentTime = input.now ?? new Date();
     const state = this.getState(input.sessionId, input.proxyId);
-    const oneMinuteAgo = currentTime.getTime() - 60_000;
+    const oneMinuteAgo = currentTime.getTime() - ANTI_BOT_VISIT_WINDOW_MS;
     state.visits = state.visits.filter((visit) => visit.createdAt.getTime() > oneMinuteAgo);
     state.visits.push({ path: input.path, createdAt: currentTime });
 
@@ -52,7 +58,7 @@ export class AntibotSimulator {
       state.sawListing = true;
     }
 
-    if (state.visits.length >= 12) {
+    if (state.visits.length >= ANTI_BOT_RATE_LIMIT_VISITS) {
       return {
         riskScore: 95,
         action: AntibotAction.RateLimit,
@@ -63,7 +69,7 @@ export class AntibotSimulator {
     const reasons: string[] = [];
     let score = 0;
 
-    if (state.visits.length >= 7) {
+    if (state.visits.length >= ANTI_BOT_HIGH_VOLUME_VISITS) {
       score += 35;
       reasons.push("volume alto por minuto");
     }

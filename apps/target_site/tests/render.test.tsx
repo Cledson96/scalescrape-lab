@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { HomePage } from "../src/components/home-page";
 import { ItemsPage } from "../src/components/items-page";
 import { LoginPage } from "../src/components/login-page";
+import { RateLimitPage } from "../src/components/rate-limit-page";
 import { DashboardPage } from "../src/components/dashboard-page";
 import { Shell } from "../src/components/shell";
 import { getLocalRecords, paginateRecords } from "../src/lib/data";
@@ -58,6 +59,14 @@ test("login page renders form and reCAPTCHA widget used by the worker", () => {
   assert.match(html, /data-challenge-id="recaptcha"/);
   assert.match(html, /g-recaptcha/);
   assert.match(html, /data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"/);
+});
+
+test("rate limit page blocks excessive protected scraping volume", () => {
+  const html = renderToStaticMarkup(<RateLimitPage reason="muitas requisicoes em 1 minuto" riskScore={95} />);
+
+  assert.match(html, /data-antibot-action="rate_limit"/);
+  assert.match(html, /Coleta temporariamente limitada/);
+  assert.match(html, /muitas requisicoes em 1 minuto/);
 });
 
 test("dashboard renders extracted items table and immediate scrape actions", () => {

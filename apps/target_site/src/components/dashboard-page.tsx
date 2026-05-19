@@ -16,11 +16,13 @@ type DashboardPages = {
   betanoItems: PaginatedItems;
 };
 
+const sourceTablesAnchor = "dados-extraidos";
+
 const dashboardTabs: Array<{ key: DashboardTab; label: string; description: string }> = [
-  { key: "fake", label: "Site fake", description: "Login, sessao e anti-bot local" },
-  { key: "books", label: "Books", description: "Preco, nota e descricao" },
-  { key: "globo", label: "Globo", description: "Noticias e imagem local" },
-  { key: "betano", label: "Betano", description: "Odds reais do scraper" }
+  { key: "fake", label: "Site fake", description: "Sessao e anti-bot" },
+  { key: "books", label: "Books", description: "Preco e nota" },
+  { key: "globo", label: "Globo", description: "Noticias e imagem" },
+  { key: "betano", label: "Betano", description: "Odds reais" }
 ];
 
 const casePillars = [
@@ -149,7 +151,7 @@ function dashboardHref(key: PageKey, value: number, pages: DashboardPages, activ
       params.set(name, String(page));
     }
   }
-  return `/dashboard?${params.toString()}`;
+  return `/dashboard?${params.toString()}#${sourceTablesAnchor}`;
 }
 
 function tabHref(tab: DashboardTab, pages: DashboardPages): string {
@@ -166,7 +168,7 @@ function tabHref(tab: DashboardTab, pages: DashboardPages): string {
   if (pages.betanoItems.page > 1) {
     params.set("betanoPage", String(pages.betanoItems.page));
   }
-  return `/dashboard?${params.toString()}`;
+  return `/dashboard?${params.toString()}#${sourceTablesAnchor}`;
 }
 
 function TablePager({ pageData, pageKey, pages, activeTab }: { pageData: PaginatedItems; pageKey: PageKey; pages: DashboardPages; activeTab: DashboardTab }) {
@@ -220,7 +222,7 @@ function SourceTabs({ activeTab, pages }: { activeTab: DashboardTab; pages: Dash
 
 function FakeItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedItems; pages: DashboardPages; activeTab: DashboardTab }) {
   return (
-    <section className="dashboard-section">
+    <section className="dashboard-section table-section">
       <div className="section-head">
         <div>
           <h2>Site fake protegido</h2>
@@ -230,11 +232,12 @@ function FakeItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIte
       </div>
       <div className="table-wrap">
         <table className="dashboard-table source-table rich-table">
+          <caption className="table-caption">Extracao protegida com login, cookie e desafio controlado</caption>
           <thead>
             <tr>
               <th>Titulo</th>
               <th>Categoria</th>
-              <th>Detalhe</th>
+              <th>Origem</th>
               <th>Job</th>
               <th>Extraido em</th>
             </tr>
@@ -243,11 +246,14 @@ function FakeItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIte
             {pageData.items.length === 0 ? <EmptyRow colSpan={5} /> : null}
             {pageData.items.map((item) => (
               <tr key={item.id}>
-                <td>{item.title}</td>
-                <td>{textValue(item.raw_data.category, "target protegido")}</td>
-                <td><a href={item.public_detail_url ?? item.detail_url}>Abrir detalhe</a></td>
-                <td>#{item.job_id}</td>
-                <td>{formatDate(item.extracted_at)}</td>
+                <td className="primary-cell">
+                  <a className="table-main-link" href={item.public_detail_url ?? item.detail_url}>{item.title}</a>
+                  <span className="table-subtle">{item.external_id}</span>
+                </td>
+                <td><span className="tag blue">{textValue(item.raw_data.category, "target protegido")}</span></td>
+                <td><span className="source-chip">fake-target</span></td>
+                <td><span className="job-pill">#{item.job_id}</span></td>
+                <td className="time-cell">{formatDate(item.extracted_at)}</td>
               </tr>
             ))}
           </tbody>
@@ -260,7 +266,7 @@ function FakeItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIte
 
 function BooksItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedItems; pages: DashboardPages; activeTab: DashboardTab }) {
   return (
-    <section className="dashboard-section">
+    <section className="dashboard-section table-section">
       <div className="section-head">
         <div>
           <h2>Books to Scrape</h2>
@@ -270,6 +276,7 @@ function BooksItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIt
       </div>
       <div className="table-wrap">
         <table className="dashboard-table extracted-table rich-table">
+          <caption className="table-caption">Catalogo externo normalizado com preco convertido e avaliacao</caption>
           <thead>
             <tr>
               <th>Titulo</th>
@@ -283,14 +290,14 @@ function BooksItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIt
             {pageData.items.length === 0 ? <EmptyRow colSpan={5} /> : null}
             {pageData.items.map((item) => (
               <tr key={item.id}>
-                <td>
-                  <a href={item.public_detail_url ?? item.detail_url}>{item.title}</a>
-                  <span className="table-subtle">job #{item.job_id}</span>
+                <td className="primary-cell">
+                  <a className="table-main-link" href={item.public_detail_url ?? item.detail_url}>{item.title}</a>
+                  <span className="table-subtle">job #{item.job_id} - {item.external_id}</span>
                 </td>
-                <td>{itemPrice(item)}</td>
-                <td>{itemRating(item)}</td>
-                <td>{shortDescription(item)}</td>
-                <td>{formatDate(item.extracted_at)}</td>
+                <td><span className="money-pill">{itemPrice(item)}</span></td>
+                <td><span className="rating-pill">{itemRating(item)}</span></td>
+                <td className="description-cell">{shortDescription(item)}</td>
+                <td className="time-cell">{formatDate(item.extracted_at)}</td>
               </tr>
             ))}
           </tbody>
@@ -303,7 +310,7 @@ function BooksItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIt
 
 function GloboItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedItems; pages: DashboardPages; activeTab: DashboardTab }) {
   return (
-    <section className="dashboard-section">
+    <section className="dashboard-section table-section">
       <div className="section-head">
         <div>
           <h2>Globo noticias</h2>
@@ -313,6 +320,7 @@ function GloboItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIt
       </div>
       <div className="table-wrap">
         <table className="dashboard-table globo-table rich-table">
+          <caption className="table-caption">Noticias publicas com categoria, thumbnail e link original preservado</caption>
           <thead>
             <tr>
               <th>Imagem</th>
@@ -334,12 +342,12 @@ function GloboItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIt
                   )}
                 </td>
                 <td><span className="tag blue">{textValue(item.raw_data.category, "noticia")}</span></td>
-                <td>
-                  <a href={item.public_detail_url ?? item.detail_url}>{item.title}</a>
+                <td className="primary-cell description-cell">
+                  <a className="table-main-link" href={item.public_detail_url ?? item.detail_url}>{item.title}</a>
                   <span className="table-subtle">{shortDescription(item, "Resumo nao disponivel")}</span>
                 </td>
-                <td><a href={item.public_detail_url ?? item.detail_url}>Abrir noticia</a></td>
-                <td>{formatDate(item.extracted_at)}</td>
+                <td><a className="table-link" href={item.public_detail_url ?? item.detail_url}>Abrir noticia</a></td>
+                <td className="time-cell">{formatDate(item.extracted_at)}</td>
               </tr>
             ))}
           </tbody>
@@ -352,7 +360,7 @@ function GloboItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedIt
 
 function BetanoItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedItems; pages: DashboardPages; activeTab: DashboardTab }) {
   return (
-    <section className="dashboard-section active-source-section">
+    <section className="dashboard-section table-section active-source-section">
       <div className="section-head">
         <div>
           <h2>Betano futebol</h2>
@@ -362,6 +370,7 @@ function BetanoItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedI
       </div>
       <div className="table-wrap">
         <table className="dashboard-table betano-table rich-table">
+          <caption className="table-caption">Mercados reais persistidos pelo worker com odds em formato auditavel</caption>
           <thead>
             <tr>
               <th>Campeonato</th>
@@ -386,16 +395,16 @@ function BetanoItemsTable({ pageData, pages, activeTab }: { pageData: PaginatedI
               return (
                 <tr key={item.id}>
                   <td><span className="tag blue">{textValue(item.raw_data.championship, "Futebol")}</span></td>
-                  <td>
-                    <a href={item.public_detail_url ?? item.detail_url}>{matchName}</a>
+                  <td className="primary-cell match-cell">
+                    <a className="table-main-link" href={item.public_detail_url ?? item.detail_url}>{matchName}</a>
                     <span className="table-subtle">job #{item.job_id}</span>
                   </td>
-                  <td>{dateTime || "-"}</td>
+                  <td className="time-cell">{dateTime || "-"}</td>
                   <td>{textValue(item.raw_data.market_type, "Resultado da partida")}</td>
-                  <td><strong className="odd-pill">{rawNumber(readNested(item.raw_data, "odds.home_raw") ?? readNested(item.raw_data, "odds.home"))}</strong></td>
-                  <td><strong className="odd-pill">{rawNumber(readNested(item.raw_data, "odds.draw_raw") ?? readNested(item.raw_data, "odds.draw"))}</strong></td>
-                  <td><strong className="odd-pill">{rawNumber(readNested(item.raw_data, "odds.away_raw") ?? readNested(item.raw_data, "odds.away"))}</strong></td>
-                  <td>{formatDate(textValue(item.raw_data.extracted_at, item.extracted_at))}</td>
+                  <td className="numeric-cell"><strong className="odd-pill">{rawNumber(readNested(item.raw_data, "odds.home_raw") ?? readNested(item.raw_data, "odds.home"))}</strong></td>
+                  <td className="numeric-cell"><strong className="odd-pill">{rawNumber(readNested(item.raw_data, "odds.draw_raw") ?? readNested(item.raw_data, "odds.draw"))}</strong></td>
+                  <td className="numeric-cell"><strong className="odd-pill">{rawNumber(readNested(item.raw_data, "odds.away_raw") ?? readNested(item.raw_data, "odds.away"))}</strong></td>
+                  <td className="time-cell">{formatDate(textValue(item.raw_data.extracted_at, item.extracted_at))}</td>
                 </tr>
               );
             })}
@@ -430,29 +439,26 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
 
   return (
     <>
-      <section className="dashboard-hero">
+      <section className="dashboard-hero dashboard-hero-compact">
         <div className="case-hero-copy">
           <span className="eyebrow">Case tecnico autoral para vaga Procob</span>
           <h1>Scraping distribuido em escala</h1>
           <p>
-            Uma iniciativa propria para demonstrar competencias em coleta de dados, mensageria, workers paralelos,
-            controle de sessao, observabilidade e deploy automatizado em um cenario inspirado em protecao ao credito
-            e prevencao a fraudes.
+            Centro operacional para disparar coletas, acompanhar jobs e validar dados persistidos por fonte, com
+            foco em rede, anti-bot, filas e observabilidade.
           </p>
           <div className="case-badge-row" aria-label="Competencias demonstradas">
             <span>HTTP, headers e cookies</span>
             <span>Retry, timeout e throughput</span>
-            <span>Monitoramento de workers</span>
-            <span>Docker na VPS</span>
+            <span>Workers e Docker na VPS</span>
           </div>
         </div>
-        <aside className="case-snapshot" aria-label="Resumo da stack">
+        <aside className="case-snapshot compact-snapshot" aria-label="Resumo da stack">
           <span>Stack e arquitetura</span>
-          <strong>Pipeline completo, observavel e pronto para demo</strong>
+          <strong>Pipeline pronto para demo</strong>
           <ul>
             <li>RabbitMQ para distribuir jobs</li>
             <li>Workers Playwright para paginas dinamicas</li>
-            <li>Postgres para historico dos dados extraidos</li>
             <li>Docker + GitHub Actions para deploy dev/main</li>
           </ul>
         </aside>
@@ -462,42 +468,12 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
         {apiError ? <div className="dashboard-alert">API indisponivel: {apiError}</div> : null}
         {createdJobs ? <div className="dashboard-alert success">Jobs criados agora: {createdJobs}</div> : null}
 
-        <section className="case-brief" aria-label="Como este case conversa com a vaga">
-          <div className="section-head">
-            <div>
-              <h2>Case criado para demonstrar fit tecnico</h2>
-              <p>O foco e mostrar investigacao, escala, rede, automacao e operacao, nao apenas uma tela bonita.</p>
-            </div>
-          </div>
-          <div className="case-brief-grid">
-            {casePillars.map((pillar) => (
-              <article className="case-pillar" key={pillar.title}>
-                <h3>{pillar.title}</h3>
-                <p>{pillar.body}</p>
-                <div className="tag-row">
-                  {pillar.tags.map((tag) => <span className="tag blue" key={tag}>{tag}</span>)}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="architecture-strip" aria-label="Arquitetura do scraping distribuido">
-          {architectureSteps.map((step, index) => (
-            <div className="architecture-step" key={step}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <strong>{step}</strong>
-            </div>
-          ))}
-        </section>
-
         <section className="dashboard-control-panel" aria-label="Criar scraping agora">
           <div className="control-copy">
             <span className="eyebrow">operacao ao vivo</span>
-            <h2>Dispare coletas e acompanhe a persistencia</h2>
+            <h2>Dispare coletas agora</h2>
             <p>
-              Cada botao cria jobs na API, envia o trabalho para a fila e deixa o worker salvar os dados extraidos
-              no Postgres para aparecerem nas tabelas abaixo.
+              Cada botao cria jobs na API, envia para a fila e alimenta as tabelas abaixo assim que o worker persiste os dados.
             </p>
           </div>
           <div className="dashboard-actions">
@@ -527,7 +503,20 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
           <div className="dashboard-metric"><strong>{failedCount}</strong><span>falhas visiveis</span></div>
         </section>
 
-        <section className="dashboard-section">
+        <section id={sourceTablesAnchor} className="source-table-shell" aria-label="Dados extraidos por fonte">
+          <div className="section-head">
+            <div>
+              <span className="section-kicker">resultado do scraping</span>
+              <h2>Dados extraidos por fonte</h2>
+              <p>Troque a fonte sem perder o contexto: a pagina volta direto para as tabelas e a fonte ativa.</p>
+            </div>
+            <span className="table-count">{visibleItems} itens</span>
+          </div>
+          <SourceTabs activeTab={activeTab} pages={pages} />
+          <ActiveSourceTable activeTab={activeTab} pages={pages} />
+        </section>
+
+        <section className="dashboard-section jobs-section">
           <div className="section-head">
             <div>
               <h2>Jobs recentes</h2>
@@ -535,7 +524,8 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
             </div>
           </div>
           <div className="table-wrap">
-            <table className="dashboard-table">
+            <table className="dashboard-table jobs-table rich-table">
+              <caption className="table-caption">Historico operacional usado para auditar execucoes e falhas recentes</caption>
               <thead>
                 <tr>
                   <th>Job</th>
@@ -546,15 +536,16 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
                 </tr>
               </thead>
               <tbody>
+                {jobs.length === 0 ? <EmptyRow colSpan={5} /> : null}
                 {jobs.slice(0, 12).map((job) => (
                   <tr key={job.id}>
-                    <td>#{job.id}</td>
+                    <td><span className="job-pill">#{job.id}</span></td>
                     <td><span className={`tag ${statusClass(job.status)}`}>{job.status}</span></td>
-                    <td>{job.items_found}</td>
-                    <td>
-                      <a href={job.public_url ?? job.start_url}>{job.public_url ?? job.start_url}</a>
+                    <td><strong className="table-number">{job.items_found}</strong></td>
+                    <td className="url-cell">
+                      <a className="table-link" href={job.public_url ?? job.start_url}>{job.public_url ?? job.start_url}</a>
                     </td>
-                    <td>{formatDate(job.created_at)}</td>
+                    <td className="time-cell">{formatDate(job.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -562,15 +553,33 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
           </div>
         </section>
 
-        <section className="source-table-shell" aria-label="Dados extraidos por fonte">
+        <section className="case-brief" aria-label="Como este case conversa com a vaga">
           <div className="section-head">
             <div>
-              <h2>Dados extraidos por fonte</h2>
-              <p>Tabelas paginadas com somente a fonte ativa renderizada, para leitura rapida durante a apresentacao.</p>
+              <h2>Case criado para demonstrar fit tecnico</h2>
+              <p>O foco e mostrar investigacao, escala, rede, automacao e operacao, nao apenas uma tela bonita.</p>
             </div>
           </div>
-          <SourceTabs activeTab={activeTab} pages={pages} />
-          <ActiveSourceTable activeTab={activeTab} pages={pages} />
+          <div className="case-brief-grid">
+            {casePillars.map((pillar) => (
+              <article className="case-pillar" key={pillar.title}>
+                <h3>{pillar.title}</h3>
+                <p>{pillar.body}</p>
+                <div className="tag-row">
+                  {pillar.tags.map((tag) => <span className="tag blue" key={tag}>{tag}</span>)}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="architecture-strip" aria-label="Arquitetura do scraping distribuido">
+          {architectureSteps.map((step, index) => (
+            <div className="architecture-step" key={step}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <strong>{step}</strong>
+            </div>
+          ))}
         </section>
       </main>
     </>

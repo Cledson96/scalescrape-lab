@@ -30,6 +30,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 96px;
 }
 
 body {
@@ -194,6 +195,12 @@ input {
   border-bottom: 1px solid rgba(8, 36, 63, 0.16);
 }
 
+.dashboard-hero.dashboard-hero-compact {
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: clamp(18px, 3vw, 34px);
+  padding: clamp(30px, 5vw, 58px) clamp(18px, 4vw, 58px) clamp(30px, 4.5vw, 52px);
+}
+
 .hero::before,
 .dashboard-hero::before {
   position: absolute;
@@ -220,6 +227,11 @@ input {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 255, 255, 0.11), transparent 68%);
   content: "";
+}
+
+.dashboard-hero-compact::before {
+  inset: 14px clamp(14px, 3vw, 40px);
+  border-radius: 28px;
 }
 
 .hero-copy,
@@ -267,6 +279,21 @@ input {
   margin: 0;
   color: rgba(255, 255, 255, 0.82);
   font-size: clamp(17px, 2vw, 21px);
+}
+
+.dashboard-hero-compact .case-hero-copy h1 {
+  max-width: 760px;
+  margin-bottom: 12px;
+  font-size: clamp(38px, 4.8vw, 58px);
+}
+
+.dashboard-hero-compact .case-hero-copy p {
+  max-width: 700px;
+  font-size: clamp(15px, 1.55vw, 18px);
+}
+
+.dashboard-hero-compact .case-badge-row {
+  margin-top: 18px;
 }
 
 .hero-actions {
@@ -777,7 +804,7 @@ input {
 
 .dashboard-content {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
 .dashboard-alert {
@@ -835,6 +862,22 @@ input {
   letter-spacing: -0.035em;
 }
 
+.case-snapshot.compact-snapshot {
+  gap: 10px;
+  min-height: 0;
+  padding: clamp(18px, 2.5vw, 24px);
+}
+
+.compact-snapshot strong {
+  max-width: 300px;
+  font-size: clamp(22px, 2.2vw, 29px);
+}
+
+.compact-snapshot ul {
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .case-snapshot li {
   color: rgba(255, 255, 255, 0.82);
 }
@@ -843,6 +886,10 @@ input {
 .dashboard-control-panel,
 .source-table-shell {
   padding: clamp(18px, 2.7vw, 28px);
+}
+
+.source-table-shell {
+  scroll-margin-top: 96px;
 }
 
 .case-brief-grid {
@@ -902,14 +949,14 @@ input {
 
 .dashboard-control-panel {
   display: grid;
-  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.22fr);
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: minmax(240px, 0.58fr) minmax(0, 1.42fr);
+  gap: 16px;
+  align-items: center;
 }
 
 .control-copy h2 {
   margin: 0 0 9px;
-  font-size: clamp(26px, 3vw, 40px);
+  font-size: clamp(24px, 2.4vw, 34px);
   line-height: 1.04;
   letter-spacing: -0.035em;
 }
@@ -934,10 +981,10 @@ input {
   display: grid;
   gap: 4px;
   width: 100%;
-  min-height: 86px;
+  min-height: 72px;
   border: 1px solid #a8dcd5;
   border-radius: 18px;
-  padding: 14px;
+  padding: 12px;
   background: linear-gradient(135deg, var(--teal), #8af3e7);
   color: #052a26;
   font-size: 14px;
@@ -974,26 +1021,26 @@ input {
 .dashboard-metrics {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .dashboard-metric {
   position: relative;
   overflow: hidden;
-  min-height: 116px;
+  min-height: 88px;
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 18px;
   background:
     radial-gradient(circle at 100% 0%, rgba(25, 198, 183, 0.14), transparent 36%),
     #ffffff;
-  padding: 18px;
+  padding: 14px;
   box-shadow: var(--shadow-soft);
 }
 
 .dashboard-metric strong {
   display: block;
   color: var(--navy-strong);
-  font-size: clamp(25px, 3vw, 38px);
+  font-size: clamp(24px, 2.5vw, 34px);
   line-height: 1;
   letter-spacing: -0.04em;
 }
@@ -1009,29 +1056,41 @@ input {
   gap: 12px;
 }
 
+.table-section {
+  gap: 10px;
+}
+
 .active-source-section {
   padding-top: 4px;
 }
 
 .dashboard-tabs {
+  position: sticky;
+  top: 78px;
+  z-index: 9;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin: 4px 0 14px;
   border: 1px solid var(--line);
-  border-radius: 22px;
-  background: #edf6fb;
-  padding: 7px;
+  border-radius: 18px;
+  background: rgba(237, 246, 251, 0.92);
+  padding: 6px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 30px rgba(8, 36, 63, 0.08);
 }
 
 .dashboard-tab {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
   gap: 5px;
-  min-height: 104px;
+  min-height: 64px;
   border: 1px solid transparent;
-  border-radius: 17px;
+  border-radius: 14px;
   background: transparent;
-  padding: 14px;
+  padding: 10px 11px;
   color: var(--ink);
   text-decoration: none;
   transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
@@ -1049,18 +1108,23 @@ input {
 }
 
 .dashboard-tab strong {
+  grid-column: 1;
   color: var(--navy-strong);
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .dashboard-tab span {
+  grid-column: 1;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .dashboard-tab em {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
   width: fit-content;
-  margin-top: 2px;
+  margin-top: 0;
   border: 1px solid #b7d7ed;
   border-radius: 999px;
   background: #eef7fc;
@@ -1077,19 +1141,34 @@ input {
   border: 1px solid var(--line);
   border-radius: 22px;
   background: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.table-caption {
+  caption-side: top;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, rgba(25, 198, 183, 0.12), transparent 44%),
+    #f8fcfe;
+  color: #2c526e;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: 0.055em;
+  text-align: left;
+  text-transform: uppercase;
 }
 
 .dashboard-table {
   width: 100%;
   min-width: 860px;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .dashboard-table th,
 .dashboard-table td {
-  padding: 15px;
+  padding: 13px 14px;
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
@@ -1103,7 +1182,12 @@ input {
   font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: #eef6fb;
+  background:
+    linear-gradient(180deg, #f5fbfe, #eaf4fa);
+}
+
+.dashboard-table tbody tr {
+  transition: background 140ms ease, box-shadow 140ms ease;
 }
 
 .dashboard-table tr:last-child td {
@@ -1122,6 +1206,95 @@ input {
   color: var(--blue);
   font-weight: 800;
   text-decoration: none;
+}
+
+.primary-cell {
+  min-width: 230px;
+}
+
+.table-main-link,
+.table-link {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.table-main-link {
+  color: var(--navy-strong) !important;
+  font-weight: 1000 !important;
+  line-height: 1.25;
+}
+
+.description-cell {
+  max-width: 420px;
+  color: #405b72;
+}
+
+.match-cell {
+  min-width: 260px;
+}
+
+.numeric-cell {
+  text-align: center !important;
+  white-space: nowrap;
+}
+
+.time-cell {
+  color: #587086;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.url-cell {
+  max-width: 520px;
+}
+
+.url-cell a {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-pill,
+.source-chip,
+.money-pill,
+.rating-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f7fbfd;
+  color: #29465f;
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.source-chip {
+  border-color: #a8dcd5;
+  background: #ecfbf8;
+  color: #087367;
+}
+
+.money-pill {
+  border-color: #b9d6e8;
+  background: #eef8ff;
+  color: var(--blue);
+}
+
+.rating-pill {
+  border-color: #f1d49f;
+  background: #fff8e8;
+  color: #8a5a0a;
+}
+
+.table-number {
+  color: var(--navy-strong);
+  font-variant-numeric: tabular-nums;
 }
 
 .extracted-table {
@@ -1253,6 +1426,10 @@ input {
 }
 
 @media (max-width: 760px) {
+  html {
+    scroll-padding-top: 16px;
+  }
+
   .topbar {
     position: static;
     align-items: flex-start;
@@ -1304,9 +1481,18 @@ input {
 
   .architecture-strip,
   .dashboard-actions,
-  .dashboard-metrics,
-  .dashboard-tabs {
+  .dashboard-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-tabs {
+    top: 0;
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    overflow-x: auto;
+  }
+
+  .dashboard-tab {
+    min-width: 150px;
   }
 
   .architecture-step {

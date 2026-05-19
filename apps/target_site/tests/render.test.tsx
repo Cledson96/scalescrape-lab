@@ -201,7 +201,7 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
 
   assert.match(html, /Case tecnico autoral para vaga Procob/);
   assert.match(html, /Scraping distribuido em escala/);
-  assert.match(html, /iniciativa propria para demonstrar competencias/);
+  assert.match(html, /Centro operacional para disparar coletas/);
   assert.match(html, /RabbitMQ/);
   assert.match(html, /Workers Playwright/);
   assert.match(html, /Docker \+ GitHub Actions/);
@@ -213,10 +213,10 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
   assert.match(html, /Consultar Globo agora/);
   assert.match(html, /Consultar Betano agora/);
   assert.match(html, /Consultar todos agora/);
-  assert.match(html, /href="\/dashboard\?tab=fake&amp;betanoPage=2"/);
-  assert.match(html, /href="\/dashboard\?tab=books&amp;betanoPage=2"/);
-  assert.match(html, /href="\/dashboard\?tab=globo&amp;betanoPage=2"/);
-  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=2"/);
+  assert.match(html, /href="\/dashboard\?tab=fake&amp;betanoPage=2#dados-extraidos"/);
+  assert.match(html, /href="\/dashboard\?tab=books&amp;betanoPage=2#dados-extraidos"/);
+  assert.match(html, /href="\/dashboard\?tab=globo&amp;betanoPage=2#dados-extraidos"/);
+  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=2#dados-extraidos"/);
   assert.match(html, /class="[^"]*dashboard-tab[^"]*active[^"]*"/);
   assert.doesNotMatch(html, /Registros coletados apos login/);
   assert.match(html, /Site fake/);
@@ -233,6 +233,6 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
   assert.match(html, /6.30/);
   assert.match(html, /3.25/);
   assert.match(html, /1.65/);
-  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=1"/);
-  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=3"/);
+  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=1#dados-extraidos"/);
+  assert.match(html, /href="\/dashboard\?tab=betano&amp;betanoPage=3#dados-extraidos"/);
 });

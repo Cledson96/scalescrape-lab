@@ -43,6 +43,7 @@ class Settings:
         "https://www.betano.bet.br/sport/futebol/",
     )
     betano_max_leagues: int = int(os.getenv("BETANO_MAX_LEAGUES", "10"))
+    betano_proxy_url: str = os.getenv("BETANO_PROXY_URL", "")
 
     def __post_init__(self) -> None:
         object.__setattr__(

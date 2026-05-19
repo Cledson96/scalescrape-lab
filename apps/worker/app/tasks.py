@@ -101,6 +101,7 @@ def run_scrape_job(self, job_id: int) -> dict:
                 media_root=settings.media_root,
                 globo_max_articles=settings.globo_max_articles,
                 betano_max_leagues=settings.betano_max_leagues,
+                betano_proxy_url=settings.betano_proxy_url,
             )
         )
         for record in records:

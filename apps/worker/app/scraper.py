@@ -67,6 +67,7 @@ async def scrape_with_playwright(
     media_root: str = "/app/media",
     globo_max_articles: int = 12,
     betano_max_leagues: int = 10,
+    betano_proxy_url: str = "",
 ) -> list[ScrapedRecord]:
     from playwright.async_api import async_playwright
 
@@ -80,6 +81,7 @@ async def scrape_with_playwright(
 
             betano_browser = await playwright.chromium.launch(
                 headless=True,
+                proxy={"server": betano_proxy_url} if betano_proxy_url else None,
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     "--no-sandbox",

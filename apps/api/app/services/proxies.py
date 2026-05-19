@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
+from app.clock import utc_now_naive
 from app.errors import NotFoundError
 from app.models import ProxyProfile
 from app.repositories import proxies as proxy_repository
@@ -38,7 +39,7 @@ def disable_proxy(session: Session, proxy_id: int) -> ProxyProfile:
 def cooldown_proxy(session: Session, proxy_id: int) -> ProxyProfile:
     proxy = get_proxy_or_raise(session, proxy_id)
     proxy.status = "cooldown"
-    proxy.cooldown_until = datetime.utcnow() + timedelta(minutes=5)
+    proxy.cooldown_until = utc_now_naive() + timedelta(minutes=5)
     session.commit()
     session.refresh(proxy)
     return proxy

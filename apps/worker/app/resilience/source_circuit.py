@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterable
 
+from app.clock import utc_now_naive
+
 ACTIVE_SOURCE_STATUS = "active"
 CIRCUIT_OPEN_SOURCE_STATUS = "circuit_open"
 CIRCUIT_FAILURE_OUTCOMES = {"blocked", "rate_limited", "timeout", "dead_lettered", "failed"}
@@ -21,7 +23,7 @@ def normalize_source_circuit(
     circuit_open_until: datetime | None,
     now: datetime | None = None,
 ) -> SourceCircuitState:
-    current = now or datetime.utcnow()
+    current = now or utc_now_naive()
     if status == CIRCUIT_OPEN_SOURCE_STATUS and circuit_open_until and circuit_open_until <= current:
         return SourceCircuitState(ACTIVE_SOURCE_STATUS, None, closed_after_expiry=True)
     return SourceCircuitState(status, circuit_open_until)
@@ -39,4 +41,4 @@ def should_open_source_circuit(recent_outcomes: Iterable[str], failure_threshold
 
 
 def next_source_circuit_deadline(cooldown_seconds: int, now: datetime | None = None) -> datetime:
-    return (now or datetime.utcnow()) + timedelta(seconds=max(1, cooldown_seconds))
+    return (now or utc_now_naive()) + timedelta(seconds=max(1, cooldown_seconds))

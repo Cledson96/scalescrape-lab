@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 from typing import Iterable, Protocol
 
+from app.clock import utc_now_naive
+
 
 class ScrapedRecordLike(Protocol):
     external_id: str
@@ -17,7 +19,7 @@ def build_scraped_item_rows(
     records: Iterable[ScrapedRecordLike],
     extracted_at: datetime | None = None,
 ) -> list[dict]:
-    batch_extracted_at = extracted_at or datetime.utcnow()
+    batch_extracted_at = extracted_at or utc_now_naive()
     rows = []
     for record in records:
         raw_data = dict(record.raw_data)

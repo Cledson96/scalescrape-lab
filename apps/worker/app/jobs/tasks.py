@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
 from billiard.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+from app.clock import utc_now_naive
 from app.captcha.mock_provider import MockCaptchaResolverProvider
 from app.captcha.two_captcha_provider import TwoCaptchaConfig, TwoCaptchaImageResolverProvider
 from app.jobs.celery_app import celery_app
@@ -295,7 +295,7 @@ def create_scheduled_job(session, job_definition: dict) -> int | None:
 
 
 def mark_job(session, job_id: int, status: str, error_message: str | None = None, items_found: int | None = None) -> None:
-    updated_at = datetime.utcnow()
+    updated_at = utc_now_naive()
     values = {
         "status": status,
         "error_message": error_message,

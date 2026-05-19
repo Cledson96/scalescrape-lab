@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import sys
@@ -230,7 +230,7 @@ class ApiContractTests(unittest.TestCase):
                 status="failed",
                 attempts=3,
                 error_message="timeout",
-                finished_at=datetime.utcnow(),
+                finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
             session.add(job)
             session.commit()

@@ -2,11 +2,8 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.clock import utc_now_naive
 from app.database import Base
-
-
-def utcnow() -> datetime:
-    return datetime.utcnow()
 
 
 class Source(Base):
@@ -17,8 +14,8 @@ class Source(Base):
     base_url: Mapped[str] = mapped_column(String(500))
     status: Mapped[str] = mapped_column(String(40), default="active")
     circuit_open_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="source")
 
@@ -37,8 +34,8 @@ class Job(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     source: Mapped[Source] = relationship(back_populates="jobs")
     events: Mapped[list["JobEvent"]] = relationship(back_populates="job")
@@ -54,7 +51,7 @@ class ScrapedItem(Base):
     title: Mapped[str] = mapped_column(String(500))
     detail_url: Mapped[str] = mapped_column(String(1000))
     raw_data: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
 
     job: Mapped[Job] = relationship(back_populates="items")
 
@@ -71,7 +68,7 @@ class JobEvent(Base):
     event_type: Mapped[str] = mapped_column(String(120), index=True)
     message: Mapped[str] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
 
     job: Mapped[Job] = relationship(back_populates="events")
 
@@ -86,7 +83,7 @@ class CaptchaChallenge(Base):
     status: Mapped[str] = mapped_column(String(60))
     solve_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
     solved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
@@ -102,7 +99,7 @@ class AntibotEvent(Base):
     action: Mapped[str] = mapped_column(String(80))
     reason: Mapped[str] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
 
 
 class ProxyProfile(Base):
@@ -119,8 +116,8 @@ class ProxyProfile(Base):
     rate_limited_count: Mapped[int] = mapped_column(Integer, default=0)
     failure_count: Mapped[int] = mapped_column(Integer, default=0)
     cooldown_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
 
 class ProxyEvent(Base):
@@ -132,5 +129,5 @@ class ProxyEvent(Base):
     event_type: Mapped[str] = mapped_column(String(120), index=True)
     message: Mapped[str] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now_naive)
 

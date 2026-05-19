@@ -1,5 +1,7 @@
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from scalescrape_contracts.clock import utc_now_naive
 
@@ -46,6 +48,10 @@ class ProxyManager:
             proxy.status = "cooldown"
             proxy.cooldown_until = utc_now_naive() + timedelta(seconds=self.cooldown_seconds)
 
+    def sync(self, proxies: list[ProxyProfileState]) -> None:
+        if proxies:
+            self.proxies = proxies
+
     def _get(self, proxy_name: str) -> ProxyProfileState:
         for proxy in self.proxies:
             if proxy.name == proxy_name:
@@ -72,3 +78,19 @@ def default_proxy_manager(
         ],
         cooldown_seconds=cooldown_seconds,
     )
+
+
+def proxy_state_from_mapping(row: Mapping[str, Any]) -> ProxyProfileState:
+    return ProxyProfileState(
+        name=str(row["name"]),
+        status=str(row.get("status") or "active"),
+        current_active_jobs=int(row.get("current_active_jobs") or 0),
+        max_concurrent_jobs=int(row.get("max_concurrent_jobs") or 3),
+        blocked_count=int(row.get("blocked_count") or 0),
+        rate_limited_count=int(row.get("rate_limited_count") or 0),
+        cooldown_until=row.get("cooldown_until"),
+    )
+
+
+def proxy_states_from_rows(rows: Iterable[Mapping[str, Any]]) -> list[ProxyProfileState]:
+    return [proxy_state_from_mapping(row) for row in rows]

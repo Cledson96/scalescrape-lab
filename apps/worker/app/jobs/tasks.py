@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from billiard.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -22,7 +23,7 @@ from app.observability.metrics import (
 )
 from app.jobs.item_persistence import build_scraped_item_rows
 from app.resilience.host_policy import PolicyError
-from app.proxy.manager import default_proxy_manager
+from app.proxy.manager import ProxyProfileState, default_proxy_manager, proxy_states_from_rows
 from app.proxy.policy import ensure_proxy_allowed
 from app.resilience.retry_policy import retry_countdown_seconds, status_after_retryable_failure
 from app.jobs.schedule import scheduled_scrape_jobs
@@ -45,6 +46,7 @@ proxy_manager = default_proxy_manager(
     enable_rotation=settings.enable_proxy_rotation,
 )
 TERMINAL_JOB_STATUSES = {"success", "failed", "blocked", "rate_limited", "blocked_by_policy", "dead_lettered"}
+logger = logging.getLogger(__name__)
 
 
 def make_captcha_provider():
@@ -159,6 +161,7 @@ def run_scrape_job(self, job_id: int) -> dict:
             SCRAPE_JOBS_BLOCKED.inc()
             return {"status": "blocked_by_policy", "source_status": source_state.status}
         ensure_proxy_allowed(job["start_url"], settings.allowed_proxy_target_hosts)
+        sync_proxy_manager_from_db(session)
         attempt = start_job_attempt(session, job_id)
         add_event(
             session,
@@ -172,6 +175,8 @@ def run_scrape_job(self, job_id: int) -> dict:
         PROXY_SELECTED.inc()
         PROXY_ACTIVE_JOBS.labels(proxy=proxy.name).set(proxy.current_active_jobs)
         add_event(session, job_id, "proxy_selected", f"Proxy {proxy.name} selecionado")
+        persist_proxy_state(session, proxy)
+        session.commit()
 
         records = asyncio.run(
             scrape_with_playwright(
@@ -229,6 +234,12 @@ def run_scrape_job(self, job_id: int) -> dict:
         if proxy:
             proxy_manager.release(proxy.name, proxy_release_outcome)
             PROXY_ACTIVE_JOBS.labels(proxy=proxy.name).set(proxy.current_active_jobs)
+            try:
+                persist_proxy_state(session, proxy)
+                session.commit()
+            except Exception as exc:
+                session.rollback()
+                logger.warning("falha_ao_sincronizar_proxy name=%s error=%s", proxy.name, exc)
         session.close()
 
 
@@ -539,6 +550,49 @@ def add_event(session, job_id: int, event_type: str, message: str, metadata: dic
             "event_type": event_type,
             "message": message,
             "metadata": json.dumps(metadata or {}, ensure_ascii=False),
+        },
+    )
+
+
+def sync_proxy_manager_from_db(session) -> None:
+    if not settings.enable_proxy_rotation:
+        return
+    rows = session.execute(
+        text(
+            """
+            select name, status, current_active_jobs, max_concurrent_jobs,
+                   blocked_count, rate_limited_count, cooldown_until
+            from proxy_profiles
+            order by name
+            """
+        )
+    ).mappings().all()
+    proxy_manager.sync(proxy_states_from_rows(rows))
+
+
+def persist_proxy_state(session, proxy: ProxyProfileState) -> None:
+    if not settings.enable_proxy_rotation or proxy.name == "direct":
+        return
+    session.execute(
+        text(
+            """
+            update proxy_profiles
+            set status = :status,
+                current_active_jobs = :current_active_jobs,
+                blocked_count = :blocked_count,
+                rate_limited_count = :rate_limited_count,
+                cooldown_until = :cooldown_until,
+                updated_at = now()
+            where name = :name
+            """
+        ),
+        {
+            "name": proxy.name,
+            "status": proxy.status,
+            "current_active_jobs": proxy.current_active_jobs,
+            "blocked_count": proxy.blocked_count,
+            "rate_limited_count": proxy.rate_limited_count,
+            "cooldown_until": proxy.cooldown_until,
         },
     )
 

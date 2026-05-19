@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir .
 COPY apps/worker/app ./app
 COPY apps/worker/tools ./tools
 
-CMD ["celery", "-A", "app.jobs.celery_app:celery_app", "worker", "--loglevel=INFO", "--pool=solo", "--concurrency=1", "-Q", "scrape.jobs,scrape.retry,scrape.captcha"]
+CMD ["celery", "-A", "app.jobs.celery_app:celery_app", "worker", "--loglevel=INFO", "--pool=solo", "--concurrency=1", "-Q", "scrape.jobs,scrape.retry,scrape.captcha,scrape.dead_letter"]

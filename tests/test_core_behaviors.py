@@ -101,6 +101,7 @@ ensure_host_allowed = worker_policy.ensure_host_allowed
 ProxyManager = worker_proxy.ProxyManager
 ProxyProfileState = worker_proxy.ProxyProfileState
 default_proxy_manager = worker_proxy.default_proxy_manager
+proxy_states_from_rows = worker_proxy.proxy_states_from_rows
 ScrapedItemRead = api_dto.ScrapedItemRead
 
 
@@ -153,6 +154,49 @@ class ProxyManagerTests(unittest.TestCase):
 
         self.assertEqual([proxy.name for proxy in manager.proxies], ["direct"])
         self.assertEqual(manager.proxies[0].max_concurrent_jobs, 5)
+
+    def test_proxy_manager_can_sync_profiles_from_database_rows(self) -> None:
+        manager = default_proxy_manager(max_concurrent_jobs=2)
+        rows = [
+            {
+                "name": "proxy-disabled",
+                "status": "disabled",
+                "current_active_jobs": 0,
+                "max_concurrent_jobs": 1,
+                "blocked_count": 0,
+                "rate_limited_count": 0,
+                "cooldown_until": None,
+            },
+            {
+                "name": "proxy-active",
+                "status": "active",
+                "current_active_jobs": 0,
+                "max_concurrent_jobs": 1,
+                "blocked_count": 2,
+                "rate_limited_count": 1,
+                "cooldown_until": None,
+            },
+        ]
+
+        manager.sync(proxy_states_from_rows(rows))
+        selected = manager.select()
+
+        self.assertEqual(selected.name, "proxy-active")
+        self.assertEqual(selected.blocked_count, 2)
+        self.assertEqual(selected.rate_limited_count, 1)
+
+
+class WorkerRuntimeConfigTests(unittest.TestCase):
+    def test_worker_image_consumes_dead_letter_queue(self) -> None:
+        dockerfile = (ROOT / "apps" / "worker" / "Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn("scrape.dead_letter", dockerfile)
+
+    def test_prometheus_server_starts_from_worker_signal_not_import_side_effect(self) -> None:
+        celery_app = (ROOT / "apps" / "worker" / "app" / "jobs" / "celery_app.py").read_text(encoding="utf-8")
+
+        self.assertIn("worker_init.connect", celery_app)
+        self.assertNotIn("\nstart_http_server(9100)", celery_app)
 
 
 class WorkerSettingsTests(unittest.TestCase):

@@ -2,5 +2,7 @@ services:
   betano-tailscale-proxy:
     image: serjs/go-socks5-proxy:latest
     restart: unless-stopped
+    environment:
+      REQUIRE_AUTH: "false"
     ports:
       - "${BETANO_LOCAL_PROXY_BIND:-0.0.0.0}:${BETANO_LOCAL_PROXY_PORT:-1080}:1080"

@@ -348,6 +348,10 @@ No computador local, suba o proxy:
 docker compose -f compose.tailscale-proxy.yml up -d
 ```
 
+Esse proxy roda sem usuario/senha para simplificar o uso pelo Playwright. Use
+somente com Tailscale ativo e firewall local; nao exponha a porta `1080` em uma
+rede publica.
+
 Descubra o IP Tailscale do computador:
 
 ```powershell

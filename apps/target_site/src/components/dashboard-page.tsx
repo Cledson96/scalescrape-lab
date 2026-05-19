@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 import type { DashboardData, ExtractedItem, JobSummary, PaginatedItems } from "../lib/dashboard-api";
 
@@ -151,7 +152,7 @@ function dashboardHref(key: PageKey, value: number, pages: DashboardPages, activ
       params.set(name, String(page));
     }
   }
-  return `/dashboard?${params.toString()}#${sourceTablesAnchor}`;
+  return `/dashboard?${params.toString()}`;
 }
 
 function tabHref(tab: DashboardTab, pages: DashboardPages): string {
@@ -168,7 +169,7 @@ function tabHref(tab: DashboardTab, pages: DashboardPages): string {
   if (pages.betanoItems.page > 1) {
     params.set("betanoPage", String(pages.betanoItems.page));
   }
-  return `/dashboard?${params.toString()}#${sourceTablesAnchor}`;
+  return `/dashboard?${params.toString()}`;
 }
 
 function TablePager({ pageData, pageKey, pages, activeTab }: { pageData: PaginatedItems; pageKey: PageKey; pages: DashboardPages; activeTab: DashboardTab }) {
@@ -180,9 +181,9 @@ function TablePager({ pageData, pageKey, pages, activeTab }: { pageData: Paginat
 
   return (
     <nav className="table-pager" aria-label="Paginacao da tabela">
-      <a className={pageData.page === 1 ? "disabled" : ""} href={dashboardHref(pageKey, previous, pages, activeTab)}>Anterior</a>
+      <Link className={pageData.page === 1 ? "disabled" : ""} href={dashboardHref(pageKey, previous, pages, activeTab)} scroll={false}>Anterior</Link>
       <span>Pagina {pageData.page} de {pageData.total_pages}</span>
-      <a className={pageData.page === pageData.total_pages ? "disabled" : ""} href={dashboardHref(pageKey, next, pages, activeTab)}>Proxima</a>
+      <Link className={pageData.page === pageData.total_pages ? "disabled" : ""} href={dashboardHref(pageKey, next, pages, activeTab)} scroll={false}>Proxima</Link>
     </nav>
   );
 }
@@ -206,15 +207,16 @@ function SourceTabs({ activeTab, pages }: { activeTab: DashboardTab; pages: Dash
   return (
     <nav className="dashboard-tabs" aria-label="Selecionar tabela">
       {dashboardTabs.map((tab) => (
-        <a
+        <Link
           key={tab.key}
           className={`dashboard-tab ${activeTab === tab.key ? "active" : ""}`}
           href={tabHref(tab.key, pages)}
+          scroll={false}
         >
           <strong>{tab.label}</strong>
           <span>{tab.description}</span>
           <em>{counts[tab.key]} itens</em>
-        </a>
+        </Link>
       ))}
     </nav>
   );

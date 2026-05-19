@@ -24,6 +24,8 @@ class Settings:
     scraper_max_attempts: int = int(os.getenv("SCRAPER_MAX_ATTEMPTS", "3"))
     scraper_page_timeout_seconds: int = int(os.getenv("SCRAPER_PAGE_TIMEOUT_SECONDS", "30"))
     scraper_job_timeout_seconds: int = int(os.getenv("SCRAPER_JOB_TIMEOUT_SECONDS", "180"))
+    source_circuit_failure_threshold: int = int(os.getenv("SOURCE_CIRCUIT_FAILURE_THRESHOLD", "3"))
+    source_circuit_cooldown_seconds: int = int(os.getenv("SOURCE_CIRCUIT_COOLDOWN_SECONDS", "900"))
     gbp_to_brl_rate: float = float(os.getenv("GBP_TO_BRL_RATE", "6.50"))
     media_root: str = os.getenv("MEDIA_ROOT", "/app/media")
     public_api_url: str = os.getenv("PUBLIC_API_URL", "http://localhost:8000")

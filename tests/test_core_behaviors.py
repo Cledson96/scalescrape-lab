@@ -55,6 +55,13 @@ from app.retry_policy import (  # noqa: E402
     should_retry_outcome,
     status_after_retryable_failure,
 )
+from app.source_circuit import (  # noqa: E402
+    CIRCUIT_OPEN_SOURCE_STATUS,
+    normalize_source_circuit,
+    next_source_circuit_deadline,
+    should_open_source_circuit,
+    source_accepts_new_jobs,
+)
 from app.captcha.two_captcha_provider import (  # noqa: E402
     TwoCaptchaConfig,
     TwoCaptchaImageResolverProvider,
@@ -170,6 +177,34 @@ class WorkerItemPersistenceTests(unittest.TestCase):
         self.assertIn('"score": 91', rows[0]["raw_data"])
         self.assertIn('"extracted_at": "2026-05-19T12:30:00"', rows[0]["raw_data"])
         self.assertNotIn("extracted_at", record.raw_data)
+
+
+class SourceCircuitPolicyTests(unittest.TestCase):
+    def test_open_circuit_blocks_new_jobs_until_deadline(self) -> None:
+        now = datetime(2026, 5, 19, 12, 0, 0)
+        deadline = datetime(2026, 5, 19, 12, 15, 0)
+
+        self.assertFalse(source_accepts_new_jobs(CIRCUIT_OPEN_SOURCE_STATUS, deadline, now=now))
+
+    def test_expired_circuit_normalizes_back_to_active(self) -> None:
+        now = datetime(2026, 5, 19, 12, 30, 0)
+        deadline = datetime(2026, 5, 19, 12, 15, 0)
+
+        state = normalize_source_circuit(CIRCUIT_OPEN_SOURCE_STATUS, deadline, now=now)
+
+        self.assertEqual(state.status, "active")
+        self.assertIsNone(state.circuit_open_until)
+        self.assertTrue(state.closed_after_expiry)
+
+    def test_repeated_retryable_outcomes_open_source_circuit(self) -> None:
+        self.assertTrue(should_open_source_circuit(["blocked", "rate_limited", "timeout"], 3))
+        self.assertFalse(should_open_source_circuit(["blocked", "success", "timeout"], 3))
+
+    def test_circuit_deadline_uses_positive_cooldown(self) -> None:
+        now = datetime(2026, 5, 19, 12, 0, 0)
+
+        self.assertEqual(next_source_circuit_deadline(900, now=now), datetime(2026, 5, 19, 12, 15, 0))
+        self.assertEqual(next_source_circuit_deadline(0, now=now), datetime(2026, 5, 19, 12, 0, 1))
 
 
 class WorkerCaptchaPolicyTests(unittest.TestCase):

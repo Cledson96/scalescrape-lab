@@ -251,6 +251,9 @@ proprio projeto ou ambientes explicitamente autorizados.
 7. Os itens sao substituidos de forma idempotente em `scraped_items`; o job passa para `success`,
    `retrying`, `dead_lettered`, `failed`, `blocked`, `rate_limited` ou
    `blocked_by_policy` conforme tentativas, timeout e resultado da coleta.
+8. Falhas consecutivas por fonte abrem `source.status = circuit_open` com
+   `circuit_open_until`; a API e o worker deixam de enfileirar/processar a fonte
+   ate o cooldown expirar ou ate `/sources/{source_id}/resume` reativar manualmente.
 
 Para Books to Scrape, o worker usa o layout `article.product_pod`, abre cada
 pagina de detalhe do livro, le `#product_description + p` e grava os campos

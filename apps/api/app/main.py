@@ -6,12 +6,13 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.database import Base, engine, get_session
-from app.metrics import SCRAPE_JOBS_TOTAL, prometheus_response
+from app.metrics import SCRAPE_JOBS_TOTAL, SCRAPE_SOURCE_CIRCUIT_OPEN, prometheus_response
 from app.models import AntibotEvent, Job, JobEvent, ProxyProfile, ScrapedItem, Source
 from app.schemas import JobCreate, JobRead, ProxyRead, ScrapedItemPageRead, ScrapedItemRead, SourceRead
 from app.services.bootstrap import seed_defaults
 from app.services.queue import enqueue_scrape_job
 from app.settings import get_settings
+from app.source_circuit import CIRCUIT_OPEN_SOURCE_STATUS, normalize_source_circuit
 
 OPENAPI_TAGS = [
     {
@@ -142,8 +143,9 @@ def create_job(payload: JobCreate, session: Session = Depends(get_session)) -> J
     source = session.scalar(select(Source).where(Source.name == payload.source))
     if source is None:
         raise HTTPException(status_code=404, detail="source_not_found")
+    refresh_source_circuit(session, source)
     if source.status != "active":
-        raise HTTPException(status_code=409, detail=f"source_{source.status}")
+        raise HTTPException(status_code=409, detail=source_unavailable_detail(source))
 
     job = Job(
         source_id=source.id,
@@ -294,12 +296,18 @@ def list_job_items(
         "Util quando a demo precisa mostrar retry apos bloqueio, falha tecnica ou ajuste operacional."
     ),
     response_description="Job reaberto com status pendente e reenviado para processamento.",
-    responses={404: {"description": "Job nao encontrado."}},
+    responses={
+        404: {"description": "Job nao encontrado."},
+        409: {"description": "Fonte do job esta pausada ou com circuito aberto."},
+    },
 )
 def retry_job(job_id: int, session: Session = Depends(get_session)) -> Job:
     job = session.get(Job, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="job_not_found")
+    refresh_source_circuit(session, job.source)
+    if job.source.status != "active":
+        raise HTTPException(status_code=409, detail=source_unavailable_detail(job.source))
     job.status = "pending"
     job.attempts = 0
     job.error_message = None
@@ -325,7 +333,14 @@ def retry_job(job_id: int, session: Session = Depends(get_session)) -> Job:
     response_description="Lista de fontes configuradas para scraping.",
 )
 def list_sources(session: Session = Depends(get_session)) -> list[Source]:
-    return list(session.scalars(select(Source).order_by(Source.name)))
+    sources = list(session.scalars(select(Source).order_by(Source.name)))
+    changed = False
+    for source in sources:
+        state = refresh_source_circuit(session, source)
+        changed = changed or state.closed_after_expiry
+    if changed:
+        session.commit()
+    return sources
 
 
 @app.post(
@@ -342,6 +357,7 @@ def pause_source(source_id: int, session: Session = Depends(get_session)) -> Sou
     if source is None:
         raise HTTPException(status_code=404, detail="source_not_found")
     source.status = "paused"
+    source.circuit_open_until = None
     session.commit()
     return source
 
@@ -459,4 +475,32 @@ def list_antibot_events(session: Session = Depends(get_session)) -> list[dict]:
         }
         for event in events
     ]
+
+
+def refresh_source_circuit(session: Session, source: Source):
+    state = normalize_source_circuit(source.status, source.circuit_open_until)
+    if state.closed_after_expiry:
+        source.status = state.status
+        source.circuit_open_until = state.circuit_open_until
+        session.flush()
+    SCRAPE_SOURCE_CIRCUIT_OPEN.labels(source=source.name).set(
+        1 if source.status == CIRCUIT_OPEN_SOURCE_STATUS else 0
+    )
+    return state
+
+
+def source_unavailable_detail(source: Source) -> dict[str, str | None]:
+    if source.status == CIRCUIT_OPEN_SOURCE_STATUS:
+        return {
+            "reason": "source_circuit_open",
+            "source": source.name,
+            "circuit_open_until": (
+                source.circuit_open_until.isoformat() if source.circuit_open_until else None
+            ),
+        }
+    return {
+        "reason": f"source_{source.status}",
+        "source": source.name,
+        "circuit_open_until": None,
+    }
 

@@ -67,6 +67,7 @@ from app.globo import (  # noqa: E402
 )
 from app.schedule import scheduled_scrape_jobs  # noqa: E402
 from app.scraper import (  # noqa: E402
+    _build_betano_api_records,
     betano_debug_artifact_paths,
     LoginCredentials,
     betano_block_message,
@@ -345,6 +346,52 @@ class ScheduledScrapeTests(unittest.TestCase):
 
 
 class BetanoDiagnosticsTests(unittest.TestCase):
+    def test_build_betano_api_records_reads_result_market(self) -> None:
+        payload = {
+            "data": {
+                "blocks": [
+                    {
+                        "name": "Inglaterra - Premier League",
+                        "events": [
+                            {
+                                "id": "85187748",
+                                "name": "AFC Bournemouth - Manchester City",
+                                "startTime": 1779215400000,
+                                "url": "/odds/afc-bournemouth-manchester-city/85187748/",
+                                "markets": [
+                                    {
+                                        "id": "2768094087",
+                                        "name": "Resultado Final SuperOdds",
+                                        "selections": [
+                                            {"name": "1", "price": 4.9, "columnIndex": 0},
+                                            {"name": "X", "price": 4.35, "columnIndex": 1},
+                                            {"name": "2", "price": 1.7, "columnIndex": 2},
+                                        ],
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+
+        records = _build_betano_api_records(
+            payload=payload,
+            proxy=ProxyProfileState("proxy-a"),
+            max_leagues=10,
+            base_url="https://www.betano.bet.br/",
+            extracted_at="2026-05-19T17:25:00+00:00",
+        )
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].external_id, "betano-85187748")
+        self.assertEqual(records[0].title, "AFC Bournemouth x Manchester City")
+        self.assertEqual(records[0].raw_data["collection_method"], "betano-api")
+        self.assertEqual(records[0].raw_data["odds"]["home"], 4.9)
+        self.assertEqual(records[0].raw_data["odds"]["draw"], 4.35)
+        self.assertEqual(records[0].raw_data["odds"]["away"], 1.7)
+
     def test_mask_proxy_url_hides_credentials(self) -> None:
         self.assertEqual(
             mask_proxy_url("socks5://user:secret@100.81.81.109:1080"),

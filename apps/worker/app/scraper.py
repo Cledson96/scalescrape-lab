@@ -36,6 +36,7 @@ from app.free_proxy import get_free_working_proxy
 
 
 BETANO_HOST = "www.betano.bet.br"
+BETANO_FOOTBALL_TODAY_API_PATH = "/api/sport/futebol/jogos-de-hoje/?req=s,stnf,c,mb,mbl"
 BOOKS_TO_SCRAPE_HOST = "books.toscrape.com"
 GLOBO_HOME_HOST = "www.globo.com"
 logger = logging.getLogger(__name__)
@@ -267,9 +268,10 @@ async def scrape_with_playwright(
     records: list[ScrapedRecord] = []
     async with async_playwright() as playwright:
         if host_from_url(start_url) == BETANO_HOST:
-            # Betano has bot detection — stealth browser + cookie session persistence
-            session_path = str(Path(media_root) / "betano_session.json")
-            storage_state = session_path if Path(session_path).exists() else None
+            # Betano's sports API currently works more reliably from a fresh
+            # context. Reusing homepage/session cookies can turn API calls into 403.
+            session_path = ""
+            storage_state = None
 
             if betano_proxy_url == "auto":
                 betano_proxy_url = await get_free_working_proxy()
@@ -718,6 +720,286 @@ async def _close_betano_landing_modal(page) -> bool:  # noqa: ANN001
     return False
 
 
+async def _reset_betano_browser_state(page, context, session_path: str = "") -> bool:  # noqa: ANN001
+    removed_session = False
+    try:
+        await context.clear_cookies()
+    except Exception:
+        pass
+
+    try:
+        await page.evaluate("""() => {
+            window.localStorage?.clear();
+            window.sessionStorage?.clear();
+        }""")
+    except Exception:
+        pass
+
+    if session_path:
+        try:
+            path = Path(session_path)
+            if path.exists():
+                path.unlink()
+                removed_session = True
+        except Exception:
+            pass
+    return removed_session
+
+
+async def _click_betano_football_from_homepage(page) -> dict:  # noqa: ANN001
+    result = {
+        "clicked": False,
+        "selector": "",
+        "href": "",
+        "mouse_response_status": 0,
+        "mouse_response_url": "",
+        "keyboard_response_status": 0,
+        "keyboard_response_url": "",
+        "url_after_click": "",
+        "error": "",
+    }
+    selectors = [
+        'a[href*="/sport/futebol"]',
+        'a:has-text("Futebol")',
+        '[role="link"]:has-text("Futebol")',
+        'text="Futebol"',
+    ]
+    for selector in selectors:
+        locator = page.locator(selector)
+        try:
+            count = await locator.count()
+        except Exception:
+            continue
+        for index in range(min(count, 10)):
+            candidate = locator.nth(index)
+            try:
+                if not await candidate.is_visible(timeout=1000):
+                    continue
+                result["selector"] = selector
+                result["href"] = await candidate.get_attribute("href") or ""
+                try:
+                    async with page.expect_response(lambda response: "/sport/futebol" in response.url, timeout=12000) as response_info:
+                        await _human_click(candidate, page)
+                    response = await response_info.value
+                    result["mouse_response_status"] = response.status
+                    result["mouse_response_url"] = response.url
+                except Exception as exc:
+                    result["error"] = str(exc)
+
+                if "/sport/futebol" not in page.url:
+                    try:
+                        await candidate.focus()
+                        async with page.expect_response(
+                            lambda response: "/sport/futebol" in response.url,
+                            timeout=12000,
+                        ) as keyboard_response_info:
+                            await page.keyboard.press("Enter")
+                        keyboard_response = await keyboard_response_info.value
+                        result["keyboard_response_status"] = keyboard_response.status
+                        result["keyboard_response_url"] = keyboard_response.url
+                    except Exception as exc:
+                        if not result["error"]:
+                            result["error"] = str(exc)
+
+                await page.wait_for_timeout(1500)
+                result["url_after_click"] = page.url
+                result["clicked"] = bool(
+                    result["mouse_response_status"]
+                    or result["keyboard_response_status"]
+                    or "/sport/futebol" in page.url
+                )
+                return result
+            except Exception as exc:
+                result["error"] = str(exc)
+                continue
+    result["url_after_click"] = page.url
+    if not result["error"]:
+        result["error"] = "link Futebol visivel nao encontrado"
+    return result
+
+
+def _betano_football_today_api_url(football_url: str) -> str:
+    base_url = football_url.split("/sport/")[0].rstrip("/")
+    return f"{base_url}{BETANO_FOOTBALL_TODAY_API_PATH}"
+
+
+def _betano_api_match_datetime(start_time_ms: int | float | None) -> dict:
+    if not start_time_ms:
+        return {"date_str": "", "time_str": "", "is_live": False, "datetime_iso": ""}
+    try:
+        parsed = datetime.fromtimestamp(float(start_time_ms) / 1000, timezone.utc)
+    except (TypeError, ValueError, OSError):
+        return {"date_str": "", "time_str": "", "is_live": False, "datetime_iso": ""}
+    return {
+        "date_str": parsed.strftime("%d/%m"),
+        "time_str": parsed.strftime("%H:%M"),
+        "is_live": False,
+        "datetime_iso": parsed.isoformat(),
+    }
+
+
+def _betano_api_teams(event: dict) -> tuple[str, str]:
+    participants = event.get("participants") or []
+    if len(participants) >= 2:
+        home = str(participants[0].get("name") or "").strip()
+        away = str(participants[1].get("name") or "").strip()
+        if home and away:
+            return home, away
+
+    name = str(event.get("name") or event.get("shortName") or "").strip()
+    for separator in (" - ", " x ", " vs "):
+        if separator in name:
+            home, away = name.split(separator, 1)
+            return home.strip(), away.strip()
+    return name, ""
+
+
+def _betano_api_result_market(event: dict) -> dict | None:
+    for market in event.get("markets") or []:
+        selections = market.get("selections") or []
+        selection_names = {str(selection.get("name") or "").strip() for selection in selections}
+        if {"1", "X", "2"}.issubset(selection_names):
+            return market
+    return None
+
+
+def _betano_api_selection_price(market: dict, name: str, column_index: int) -> str:
+    selections = market.get("selections") or []
+    for selection in selections:
+        if str(selection.get("name") or "").strip() == name:
+            return str(selection.get("price") or "")
+    for selection in selections:
+        if selection.get("columnIndex") == column_index:
+            return str(selection.get("price") or "")
+    return ""
+
+
+def _build_betano_api_records(
+    *,
+    payload: dict,
+    proxy: ProxyProfileState,
+    max_leagues: int,
+    base_url: str,
+    extracted_at: str,
+) -> list[ScrapedRecord]:
+    records: list[ScrapedRecord] = []
+    blocks = payload.get("data", {}).get("blocks", [])
+    leagues = blocks[:max_leagues] if max_leagues > 0 else blocks
+
+    for block in leagues:
+        championship = str(block.get("name") or block.get("shortName") or "Futebol").strip()
+        for event in block.get("events") or []:
+            market = _betano_api_result_market(event)
+            if not market:
+                continue
+            home_team, away_team = _betano_api_teams(event)
+            if not home_team or not away_team:
+                continue
+
+            match_datetime = _betano_api_match_datetime(event.get("startTime"))
+            match_url = urljoin(base_url, str(event.get("url") or ""))
+            odd_home = _betano_api_selection_price(market, "1", 0)
+            odd_draw = _betano_api_selection_price(market, "X", 1)
+            odd_away = _betano_api_selection_price(market, "2", 2)
+            raw_data = build_betano_record_payload(
+                home_team=home_team,
+                away_team=away_team,
+                championship=championship,
+                market_type=str(market.get("name") or "Resultado da partida"),
+                odd_home=odd_home,
+                odd_draw=odd_draw,
+                odd_away=odd_away,
+                match_datetime=match_datetime,
+                match_url=match_url,
+                extracted_at=extracted_at,
+            )
+            raw_data.update(
+                {
+                    "collection_method": "betano-api",
+                    "api_event_id": event.get("id"),
+                    "api_market_id": market.get("id"),
+                    "proxy_profile": proxy.name,
+                }
+            )
+            external_id = f"betano-{event.get('id')}" if event.get("id") else extract_betano_external_id(
+                home_team,
+                away_team,
+                championship,
+                match_datetime.get("datetime_iso", ""),
+            )
+            records.append(
+                ScrapedRecord(
+                    external_id=external_id,
+                    title=f"{home_team} x {away_team}",
+                    detail_url=match_url,
+                    raw_data=raw_data,
+                )
+            )
+
+    return records
+
+
+async def _scrape_betano_football_api(
+    *,
+    page,
+    context,
+    football_url: str,
+    start_url: str,
+    proxy: ProxyProfileState,
+    max_leagues: int,
+    media_root: str,
+    public_api_url: str,
+    debug_artifacts: bool,
+    debug_max_artifacts: int,
+    betano_proxy_url: str | None,
+    betano_egress_ip: str | None,
+) -> list[ScrapedRecord]:
+    await _reset_betano_browser_state(page, context)
+    api_url = _betano_football_today_api_url(football_url)
+    response = await page.goto(api_url, wait_until="domcontentloaded", timeout=20000)
+    status = response.status if response else 0
+
+    if status in (403, 429):
+        artifact = None
+        if debug_artifacts:
+            artifact = await maybe_save_betano_debug_artifacts(
+                page=page,
+                media_root=media_root,
+                public_api_url=public_api_url,
+                label=f"api-football-http-{status}",
+                status_code=status,
+                start_url=start_url,
+                proxy_url=betano_proxy_url,
+                egress_ip=betano_egress_ip,
+                max_artifacts=debug_max_artifacts,
+                context={"stage": "api-football", "api_url": api_url},
+            )
+        raise ScrapeBlocked(
+            status,
+            _message_with_debug_url(betano_block_message(status, betano_proxy_url, betano_egress_ip, "api futebol"), artifact),
+        )
+
+    if status >= 400:
+        return []
+
+    body = (await page.locator("body").inner_text(timeout=5000)).strip()
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return []
+
+    records = _build_betano_api_records(
+        payload=payload,
+        proxy=proxy,
+        max_leagues=max_leagues,
+        base_url=football_url.split("/sport/")[0].rstrip("/") + "/",
+        extracted_at=datetime.now(timezone.utc).isoformat(),
+    )
+    if records:
+        logger.info("Betano API retornou %s jogos", len(records))
+    return records
+
+
 async def scrape_betano_football(
     *,
     page,
@@ -746,11 +1028,31 @@ async def scrape_betano_football(
     if not football_url.rstrip("/").endswith("/sport/futebol"):
         football_url = start_url.rstrip("/") + "/sport/futebol/"
 
+    api_records = await _scrape_betano_football_api(
+        page=page,
+        context=context,
+        football_url=football_url,
+        start_url=start_url,
+        proxy=proxy,
+        max_leagues=max_leagues,
+        media_root=media_root,
+        public_api_url=public_api_url,
+        debug_artifacts=debug_artifacts,
+        debug_max_artifacts=debug_max_artifacts,
+        betano_proxy_url=betano_proxy_url,
+        betano_egress_ip=betano_egress_ip,
+    )
+    if api_records:
+        return api_records
+
     # Navigate to the homepage first to build a natural session/cookies,
     # then navigate to football — direct deep links from datacenter IPs get blocked.
     homepage = football_url.split("/sport/")[0] + "/"
     homepage_status = 0
     homepage_error = ""
+    homepage_retry_status = 0
+    homepage_retry_error = ""
+    session_file_removed = False
     accepted_age = False
     closed_landing_modal = False
     try:
@@ -761,6 +1063,19 @@ async def scrape_betano_football(
         closed_landing_modal = await _close_betano_landing_modal(page)
     except Exception as exc:
         homepage_error = str(exc)
+
+    if homepage_status in (403, 429):
+        session_file_removed = await _reset_betano_browser_state(page, context, session_path)
+        try:
+            await page.wait_for_timeout(random.randint(1500, 2500))
+            homepage_response = await page.goto(homepage, wait_until="domcontentloaded", timeout=15000)
+            homepage_retry_status = homepage_response.status if homepage_response else 0
+            homepage_status = homepage_retry_status
+            await page.wait_for_timeout(random.randint(2000, 3500))
+            accepted_age = await _accept_betano_age_verification(page)
+            closed_landing_modal = await _close_betano_landing_modal(page)
+        except Exception as exc:
+            homepage_retry_error = str(exc)
 
     if homepage_status in (403, 429):
         artifact = None
@@ -778,6 +1093,10 @@ async def scrape_betano_football(
                 context={
                     "stage": "homepage",
                     "homepage_url": homepage,
+                    "homepage_error": homepage_error,
+                    "homepage_retry_status": homepage_retry_status,
+                    "homepage_retry_error": homepage_retry_error,
+                    "session_file_removed": session_file_removed,
                     "accepted_age": accepted_age,
                     "closed_landing_modal": closed_landing_modal,
                 },
@@ -789,10 +1108,17 @@ async def scrape_betano_football(
             ),
         )
 
-    # Now navigate to the actual football page
+    # Prefer a fresh human-like click from the loaded homepage. If the SPA does
+    # not navigate, fall back to the direct football URL and keep diagnostics.
+    football_click = await _click_betano_football_from_homepage(page)
+
+    # Now navigate to the actual football page when the homepage click did not land there.
     football_error = ""
     try:
-        response = await page.goto(football_url, wait_until="domcontentloaded")
+        if "/sport/futebol" in page.url:
+            response = None
+        else:
+            response = await page.goto(football_url, wait_until="domcontentloaded")
     except Exception as exc:
         football_error = str(exc)
         artifact = None
@@ -812,13 +1138,17 @@ async def scrape_betano_football(
                     "football_url": football_url,
                     "homepage_status": homepage_status,
                     "homepage_error": homepage_error,
+                    "homepage_retry_status": homepage_retry_status,
+                    "homepage_retry_error": homepage_retry_error,
+                    "session_file_removed": session_file_removed,
                     "accepted_age": accepted_age,
                     "closed_landing_modal": closed_landing_modal,
+                    "football_click": football_click,
                     "navigation_error": football_error,
                 },
             )
         raise RuntimeError(_message_with_debug_url(f"falha ao navegar Betano futebol: {football_error}", artifact))
-    status = response.status if response else 0
+    status = response.status if response else 200
 
     # Retry logic: some anti-bot systems resolve after JS challenge or cookie warmup
     for attempt in range(3):
@@ -847,8 +1177,12 @@ async def scrape_betano_football(
                     "football_url": football_url,
                     "homepage_status": homepage_status,
                     "homepage_error": homepage_error,
+                    "homepage_retry_status": homepage_retry_status,
+                    "homepage_retry_error": homepage_retry_error,
+                    "session_file_removed": session_file_removed,
                     "accepted_age": accepted_age,
                     "closed_landing_modal": closed_landing_modal,
+                    "football_click": football_click,
                 },
             )
         raise ScrapeBlocked(
@@ -943,8 +1277,12 @@ async def scrape_betano_football(
                     "football_url": football_url,
                     "homepage_status": homepage_status,
                     "homepage_error": homepage_error,
+                    "homepage_retry_status": homepage_retry_status,
+                    "homepage_retry_error": homepage_retry_error,
+                    "session_file_removed": session_file_removed,
                     "accepted_age": accepted_age,
                     "closed_landing_modal": closed_landing_modal,
+                    "football_click": football_click,
                 },
             )
         raise RuntimeError(_message_with_debug_url(message, artifact))

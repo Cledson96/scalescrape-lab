@@ -14,6 +14,7 @@ import re
 BETANO_HOME_URL = "https://www.betano.bet.br/"
 BETANO_FOOTBALL_URL = "https://www.betano.bet.br/sport/futebol/"
 BETANO_FOOTBALL_TODAY_URL = "https://www.betano.bet.br/sport/futebol/jogos-de-hoje/"
+BETANO_FOOTBALL_TODAY_API_URL = "https://www.betano.bet.br/api/sport/futebol/jogos-de-hoje/?req=s,stnf,c,mb,mbl"
 IPIFY_URL = "https://api.ipify.org?format=text"
 
 
@@ -272,6 +273,15 @@ async def run_attempt(playwright, *, name: str, proxy_url: str, args: list[str],
         print(f"  proxy={proxy_url or 'sem proxy'}")
         print(f"  egress_ip={egress_ip}")
 
+        fresh_api_status = await probe_url(
+            page,
+            label="football-api-fresh",
+            url=BETANO_FOOTBALL_TODAY_API_URL,
+            attempt_name=name,
+            proxy_url=proxy_url,
+            egress_ip=egress_ip,
+        )
+
         homepage_status = await probe_url(
             page,
             label="homepage",
@@ -285,6 +295,14 @@ async def run_attempt(playwright, *, name: str, proxy_url: str, args: list[str],
         closed_landing_modal = await close_landing_modal(page)
         print(f"  landing_modal={'fechado' if closed_landing_modal else 'nao encontrado'}")
         await click_football_from_homepage(page, attempt_name=name, proxy_url=proxy_url, egress_ip=egress_ip)
+        api_after_home_status = await probe_url(
+            page,
+            label="football-api-after-homepage",
+            url=BETANO_FOOTBALL_TODAY_API_URL,
+            attempt_name=name,
+            proxy_url=proxy_url,
+            egress_ip=egress_ip,
+        )
         football_status = await probe_url(
             page,
             label="football",
@@ -312,7 +330,10 @@ async def run_attempt(playwright, *, name: str, proxy_url: str, args: list[str],
             userAgent: navigator.userAgent,
         })""")
         print(f"  fingerprints={fp}")
-        if homepage_status in (403, 429) or football_status in (403, 429) or football_today_status in (403, 429):
+        if any(
+            status in (403, 429)
+            for status in (fresh_api_status, homepage_status, api_after_home_status, football_status, football_today_status)
+        ):
             print("  diagnostico=Betano bloqueou a navegacao HTTP nesta tentativa")
     finally:
         await browser.close()

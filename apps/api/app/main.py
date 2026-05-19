@@ -68,7 +68,7 @@ API do laboratorio **ScaleScrape Lab**, criada para demonstrar um pipeline de sc
 - `globo-home`: noticias publicas com enriquecimento de metadados e imagem;
 - `betano-football`: odds reais usadas para demonstrar scraping de layout dinamico.
 
-## Endpoints uteis durante a apresentacao
+## Endpoints uteis
 
 - Swagger UI: `/docs`
 - OpenAPI JSON: `/openapi.json`

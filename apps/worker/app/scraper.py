@@ -305,15 +305,15 @@ async def scrape_with_playwright(
                 },
                 storage_state=storage_state,
             )
-            # Comprehensive stealth: patch all major headless fingerprints
+            # Align browser-exposed fields with a regular Chromium session.
             await betano_context.add_init_script("""
-                // Hide webdriver flag
+                // Avoid exposing automation-only webdriver state.
                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
 
-                // Fake chrome runtime (real Chrome always has this)
+                // Provide Chrome runtime fields expected by client-side scripts.
                 window.chrome = {runtime: {}, loadTimes: function(){}, csi: function(){}};
 
-                // Fake plugins (headless has 0 plugins)
+                // Populate plugin metadata commonly present in desktop Chromium.
                 Object.defineProperty(navigator, 'plugins', {
                     get: () => [
                         {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer'},
@@ -322,17 +322,17 @@ async def scrape_with_playwright(
                     ],
                 });
 
-                // Fake languages
+                // Keep locale signals consistent with the request headers.
                 Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt', 'en-US', 'en']});
 
-                // Fake permissions API (headless denies all)
+                // Match notification permission semantics from full Chromium.
                 const originalQuery = window.navigator.permissions.query;
                 window.navigator.permissions.query = (parameters) =>
                     parameters.name === 'notifications'
                         ? Promise.resolve({state: Notification.permission})
                         : originalQuery(parameters);
 
-                // Fix iframe contentWindow detection
+                // Keep iframe runtime fields consistent with the top-level window.
                 const origGetter = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow').get;
                 Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
                     get: function() {
@@ -343,7 +343,7 @@ async def scrape_with_playwright(
                     }
                 });
 
-                // Fake WebGL renderer (headless shows "Google SwiftShader")
+                // Use stable WebGL vendor strings for reproducible sessions.
                 const getParameter = WebGLRenderingContext.prototype.getParameter;
                 WebGLRenderingContext.prototype.getParameter = function(parameter) {
                     if (parameter === 37445) return 'Intel Inc.';
@@ -351,15 +351,15 @@ async def scrape_with_playwright(
                     return getParameter.call(this, parameter);
                 };
 
-                // Fake connection (headless shows odd rtt values)
+                // Normalize network information exposed to page scripts.
                 Object.defineProperty(navigator, 'connection', {
                     get: () => ({effectiveType: '4g', rtt: 50, downlink: 10, saveData: false}),
                 });
 
-                // Fake hardwareConcurrency (headless often shows 1 or 2)
+                // Expose a realistic desktop CPU profile.
                 Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
 
-                // Fake platform
+                // Keep platform aligned with the selected user agent.
                 Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});
             """)
             betano_page = await betano_context.new_page()
@@ -663,11 +663,8 @@ async def download_globo_image(*, page, image_url: str, external_id: str, media_
     return image_path, image_public_path
 
 
-async def _human_click(element, page) -> None:
-    """Simulate a human-like click: scroll into view, hover, random delay, then click.
-
-    This makes interactions harder to fingerprint as automated bot behavior.
-    """
+async def _browser_paced_click(element, page) -> None:
+    """Execute a browser-paced click with scroll, hover and small timing variance."""
     import random
     await element.scroll_into_view_if_needed()
     await page.wait_for_timeout(random.randint(200, 500))
@@ -686,7 +683,7 @@ async def _accept_betano_age_verification(page) -> bool:  # noqa: ANN001
         try:
             if await button.count() == 0:
                 continue
-            await _human_click(button, page)
+            await _browser_paced_click(button, page)
             try:
                 await page.locator("#age-verification-modal").wait_for(state="hidden", timeout=5000)
             except Exception:
@@ -708,7 +705,7 @@ async def _close_betano_landing_modal(page) -> bool:  # noqa: ANN001
         try:
             if await button.count() == 0:
                 continue
-            await _human_click(button, page)
+            await _browser_paced_click(button, page)
             try:
                 await page.locator('[data-testid="landing-modal"]').wait_for(state="hidden", timeout=5000)
             except Exception:
@@ -779,7 +776,7 @@ async def _click_betano_football_from_homepage(page) -> dict:  # noqa: ANN001
                 result["href"] = await candidate.get_attribute("href") or ""
                 try:
                     async with page.expect_response(lambda response: "/sport/futebol" in response.url, timeout=12000) as response_info:
-                        await _human_click(candidate, page)
+                        await _browser_paced_click(candidate, page)
                     response = await response_info.value
                     result["mouse_response_status"] = response.status
                     result["mouse_response_url"] = response.url
@@ -1019,7 +1016,7 @@ async def scrape_betano_football(
 
     Navigates to the football page, iterates through each popular league tab,
     and collects match data with 1/X/2 odds for each visible game.
-    Uses human-like interactions and persists session cookies between runs.
+    Uses browser-paced interactions and persists session cookies between runs.
     """
     import random
     from datetime import datetime, timezone
@@ -1045,8 +1042,8 @@ async def scrape_betano_football(
     if api_records:
         return api_records
 
-    # Navigate to the homepage first to build a natural session/cookies,
-    # then navigate to football — direct deep links from datacenter IPs get blocked.
+    # Build homepage session state before direct football navigation; some
+    # egress networks receive access-control responses on deep links.
     homepage = football_url.split("/sport/")[0] + "/"
     homepage_status = 0
     homepage_error = ""
@@ -1108,7 +1105,7 @@ async def scrape_betano_football(
             ),
         )
 
-    # Prefer a fresh human-like click from the loaded homepage. If the SPA does
+    # Prefer a fresh browser-paced click from the loaded homepage. If the SPA does
     # not navigate, fall back to the direct football URL and keep diagnostics.
     football_click = await _click_betano_football_from_homepage(page)
 
@@ -1150,7 +1147,7 @@ async def scrape_betano_football(
         raise RuntimeError(_message_with_debug_url(f"falha ao navegar Betano futebol: {football_error}", artifact))
     status = response.status if response else 200
 
-    # Retry logic: some anti-bot systems resolve after JS challenge or cookie warmup
+    # Retry access-control responses after JS execution and cookie warmup.
     for attempt in range(3):
         if status not in (403, 429):
             break
@@ -1190,15 +1187,15 @@ async def scrape_betano_football(
             _message_with_debug_url(betano_block_message(status, betano_proxy_url, betano_egress_ip, "futebol"), artifact),
         )
 
-    # Simulate a human reading the page after it loads
+    # Allow dynamic modules and lazy-loaded odds to settle after navigation.
     await page.wait_for_timeout(random.randint(2500, 4000))
     closed_landing_modal = await _close_betano_landing_modal(page) or closed_landing_modal
 
-    # Scroll down slowly to simulate reading — also triggers lazy-loaded content
+    # Incremental scroll also triggers lazy-loaded content.
     for scroll_y in (200, 450, 700):
         await page.evaluate(f"window.scrollTo({{top: {scroll_y}, behavior: 'smooth'}})")
         await page.wait_for_timeout(random.randint(300, 600))
-    # Scroll back up to the POPULARES section
+    # Return to the POPULARES section before collecting league cards.
     await page.evaluate("window.scrollTo({top: 0, behavior: 'smooth'})")
     await page.wait_for_timeout(random.randint(400, 800))
 
@@ -1291,9 +1288,9 @@ async def scrape_betano_football(
         extracted_at = datetime.now(timezone.utc).isoformat()
 
         try:
-            # Human-like click: scroll → hover → random delay → click
-            await _human_click(tab_el, page)
-            # Random wait between tabs (1.5s–3.5s) like a human reading content
+            # Browser-paced click: scroll, hover, timing variance and click.
+            await _browser_paced_click(tab_el, page)
+            # Wait between tabs to let dynamic odds panels stabilize.
             await page.wait_for_timeout(random.randint(1500, 3500))
 
             market_type = "Resultado da partida"

@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import types
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -99,6 +100,7 @@ PolicyError = worker_policy.PolicyError
 ensure_host_allowed = worker_policy.ensure_host_allowed
 ProxyManager = worker_proxy.ProxyManager
 ProxyProfileState = worker_proxy.ProxyProfileState
+default_proxy_manager = worker_proxy.default_proxy_manager
 ScrapedItemRead = api_dto.ScrapedItemRead
 
 
@@ -139,6 +141,52 @@ class ProxyManagerTests(unittest.TestCase):
         manager.release("proxy-a", "rate_limited")
         self.assertEqual(proxy.status, "cooldown")
         self.assertIsNotNone(proxy.cooldown_until)
+
+    def test_default_proxy_manager_honors_max_concurrency_and_cooldown(self) -> None:
+        manager = default_proxy_manager(max_concurrent_jobs=7, cooldown_seconds=42)
+
+        self.assertEqual(manager.cooldown_seconds, 42)
+        self.assertEqual([proxy.max_concurrent_jobs for proxy in manager.proxies], [7, 7, 7])
+
+    def test_default_proxy_manager_can_disable_rotation(self) -> None:
+        manager = default_proxy_manager(max_concurrent_jobs=5, cooldown_seconds=30, enable_rotation=False)
+
+        self.assertEqual([proxy.name for proxy in manager.proxies], ["direct"])
+        self.assertEqual(manager.proxies[0].max_concurrent_jobs, 5)
+
+
+class WorkerSettingsTests(unittest.TestCase):
+    def test_promised_worker_flags_are_loaded_from_env(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "TARGET_SITE_FIXED_CAPTCHA_ANSWER": "XYZ12",
+                "ENABLE_PROXY_ROTATION": "false",
+                "PROXY_COOLDOWN_SECONDS": "123",
+                "MAX_CONCURRENT_JOBS_PER_PROXY": "9",
+            },
+        ):
+            module = load_module(
+                "worker_settings_promised_flags_test",
+                ROOT / "apps" / "worker" / "app" / "settings.py",
+            )
+            config = module.Settings()
+
+        self.assertEqual(config.target_site_fixed_captcha_answer, "XYZ12")
+        self.assertFalse(config.enable_proxy_rotation)
+        self.assertEqual(config.proxy_cooldown_seconds, 123)
+        self.assertEqual(config.max_concurrent_jobs_per_proxy, 9)
+
+    def test_proxy_allowlist_env_is_authoritative(self) -> None:
+        with patch.dict(os.environ, {"ALLOWED_PROXY_TARGET_HOSTS": "target-site"}):
+            module = load_module(
+                "worker_settings_proxy_allowlist_test",
+                ROOT / "apps" / "worker" / "app" / "settings.py",
+            )
+            config = module.Settings()
+
+        self.assertEqual(config.allowed_proxy_target_hosts, {"target-site"})
+        self.assertNotIn("www.betano.bet.br", config.allowed_proxy_target_hosts)
 
 
 class WorkerRetryPolicyTests(unittest.TestCase):

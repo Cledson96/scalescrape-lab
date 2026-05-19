@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from scalescrape_contracts.clock import utc_now_naive
 
 
 @dataclass
@@ -13,7 +15,7 @@ class ProxyProfileState:
     cooldown_until: datetime | None = None
 
     def available(self, now: datetime | None = None) -> bool:
-        current = now or datetime.now(timezone.utc).replace(tzinfo=None)
+        current = now or utc_now_naive()
         if self.status == "cooldown" and self.cooldown_until and self.cooldown_until <= current:
             self.status = "active"
             self.cooldown_until = None
@@ -42,9 +44,7 @@ class ProxyManager:
             proxy.rate_limited_count += 1
         if proxy.blocked_count >= 2 or proxy.rate_limited_count >= 3:
             proxy.status = "cooldown"
-            proxy.cooldown_until = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
-                seconds=self.cooldown_seconds
-            )
+            proxy.cooldown_until = utc_now_naive() + timedelta(seconds=self.cooldown_seconds)
 
     def _get(self, proxy_name: str) -> ProxyProfileState:
         for proxy in self.proxies:
@@ -53,11 +53,22 @@ class ProxyManager:
         raise KeyError(proxy_name)
 
 
-def default_proxy_manager(max_concurrent_jobs: int = 3) -> ProxyManager:
+def default_proxy_manager(
+    *,
+    max_concurrent_jobs: int = 3,
+    cooldown_seconds: int = 300,
+    enable_rotation: bool = True,
+) -> ProxyManager:
+    if not enable_rotation:
+        return ProxyManager(
+            [ProxyProfileState("direct", max_concurrent_jobs=max_concurrent_jobs)],
+            cooldown_seconds=cooldown_seconds,
+        )
     return ProxyManager(
         [
             ProxyProfileState("proxy-a", max_concurrent_jobs=max_concurrent_jobs),
             ProxyProfileState("proxy-b", max_concurrent_jobs=max_concurrent_jobs),
             ProxyProfileState("proxy-c", max_concurrent_jobs=max_concurrent_jobs),
-        ]
+        ],
+        cooldown_seconds=cooldown_seconds,
     )

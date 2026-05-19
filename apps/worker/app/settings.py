@@ -19,8 +19,11 @@ class Settings:
     max_captcha_solves_per_run: int = int(os.getenv("MAX_CAPTCHA_SOLVES_PER_RUN", "20"))
     target_site_username: str = os.getenv("TARGET_SITE_USERNAME", "demo")
     target_site_password: str = os.getenv("TARGET_SITE_PASSWORD", "demo123")
+    target_site_fixed_captcha_answer: str = os.getenv("TARGET_SITE_FIXED_CAPTCHA_ANSWER", "ABCDE")
     enable_proxy_rotation: bool = os.getenv("ENABLE_PROXY_ROTATION", "true").lower() == "true"
     allowed_proxy_target_hosts: set[str] = None  # type: ignore[assignment]
+    proxy_cooldown_seconds: int = int(os.getenv("PROXY_COOLDOWN_SECONDS", "300"))
+    max_concurrent_jobs_per_proxy: int = int(os.getenv("MAX_CONCURRENT_JOBS_PER_PROXY", "3"))
     scraper_max_attempts: int = int(os.getenv("SCRAPER_MAX_ATTEMPTS", "3"))
     scraper_page_timeout_seconds: int = int(os.getenv("SCRAPER_PAGE_TIMEOUT_SECONDS", "30"))
     scraper_job_timeout_seconds: int = int(os.getenv("SCRAPER_JOB_TIMEOUT_SECONDS", "180"))
@@ -59,8 +62,10 @@ class Settings:
         object.__setattr__(
             self,
             "allowed_proxy_target_hosts",
-            csv_env("ALLOWED_PROXY_TARGET_HOSTS", "target-site,localhost,127.0.0.1")
-            | {"books.toscrape.com", "www.globo.com", "www.betano.bet.br"},
+            csv_env(
+                "ALLOWED_PROXY_TARGET_HOSTS",
+                "target-site,localhost,127.0.0.1,books.toscrape.com,www.globo.com,www.betano.bet.br",
+            ),
         )
 
 

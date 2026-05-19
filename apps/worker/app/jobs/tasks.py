@@ -39,7 +39,11 @@ from app.resilience.source_circuit import (
 
 engine = create_engine(settings.database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-proxy_manager = default_proxy_manager()
+proxy_manager = default_proxy_manager(
+    max_concurrent_jobs=settings.max_concurrent_jobs_per_proxy,
+    cooldown_seconds=settings.proxy_cooldown_seconds,
+    enable_rotation=settings.enable_proxy_rotation,
+)
 TERMINAL_JOB_STATUSES = {"success", "failed", "blocked", "rate_limited", "blocked_by_policy", "dead_lettered"}
 
 
@@ -53,7 +57,7 @@ def make_captcha_provider():
                 max_solves_per_run=settings.max_captcha_solves_per_run,
             )
         )
-    return MockCaptchaResolverProvider()
+    return MockCaptchaResolverProvider(answer=settings.target_site_fixed_captcha_answer)
 
 
 @celery_app.task(name=ENQUEUE_SCHEDULED_TASK)

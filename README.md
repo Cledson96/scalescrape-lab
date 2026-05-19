@@ -397,6 +397,15 @@ passa a trazer um link `debug=https://api.../media/betano-debug/<arquivo>.json`
 para abrir no navegador e entender se houve 403, redirect, pagina vazia ou
 mudanca de markup.
 
+Para diagnosticar a fonte manualmente no mesmo ambiente do worker:
+
+```bash
+docker compose run --rm -e BETANO_PROXY_URL=socks5://100.81.81.109:1080 worker python test_betano.py
+```
+
+O script imprime o IP de saida do navegador, testa homepage e URLs de futebol,
+fecha modais conhecidos e salva JSON/HTML/screenshot em `/app/media/betano-debug`.
+
 ## Regras De Seguranca
 
 Este projeto pode:
@@ -406,6 +415,8 @@ Este projeto pode:
 - simular proxy rotation em ambiente local
 - simular 403, 429, timeout e challenge
 - demonstrar arquitetura de scraping em escala
+- diagnosticar fontes publicas configuradas, como Betano, em baixo volume
+- usar navegador controlado, cookies de sessao e proxy proprio/Tailscale para reproduzir bloqueios e validar coleta autorizada
 
 Este projeto nao faz:
 
@@ -414,7 +425,7 @@ Este projeto nao faz:
 - proxy rotation agressiva contra sites reais
 - coleta de dados pessoais reais
 - scraping agressivo em sites reais
-- tentativa de esconder automacao de sistemas reais
+- uso de credenciais, sessoes ou dados de terceiros sem autorizacao
 
 ## Testes
 

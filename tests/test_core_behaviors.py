@@ -358,6 +358,15 @@ class BetanoDiagnosticsTests(unittest.TestCase):
             "bloqueio HTTP 403 no Betano (proxy=socks5://100.81.81.109:1080, egress_ip=186.214.56.189)",
         )
 
+    def test_betano_block_message_can_include_navigation_stage(self) -> None:
+        self.assertEqual(
+            betano_block_message(403, "socks5://100.81.81.109:1080", "186.214.56.189", "homepage"),
+            (
+                "bloqueio HTTP 403 no Betano durante homepage "
+                "(proxy=socks5://100.81.81.109:1080, egress_ip=186.214.56.189)"
+            ),
+        )
+
     def test_betano_no_league_tabs_message_includes_page_diagnostics(self) -> None:
         self.assertEqual(
             betano_no_league_tabs_message(42, 9, "https://www.betano.bet.br/sport/futebol/"),

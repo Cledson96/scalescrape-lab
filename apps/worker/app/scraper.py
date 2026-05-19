@@ -82,11 +82,17 @@ def mask_proxy_url(proxy_url: str | None) -> str:
     return urlunsplit((parsed.scheme, f"***:***@{host}{port}", "", "", ""))
 
 
-def betano_block_message(status_code: int, proxy_url: str | None, egress_ip: str | None = None) -> str:
+def betano_block_message(
+    status_code: int,
+    proxy_url: str | None,
+    egress_ip: str | None = None,
+    stage: str | None = None,
+) -> str:
     details = [f"proxy={mask_proxy_url(proxy_url)}"]
     if egress_ip:
         details.append(f"egress_ip={egress_ip}")
-    return f"bloqueio HTTP {status_code} no Betano ({', '.join(details)})"
+    stage_text = f" durante {stage}" if stage else ""
+    return f"bloqueio HTTP {status_code} no Betano{stage_text} ({', '.join(details)})"
 
 
 def betano_no_league_tabs_message(clickable_count: int, odds_count: int, current_url: str) -> str:
@@ -154,6 +160,7 @@ async def save_betano_debug_artifacts(
     proxy_url: str | None,
     egress_ip: str | None,
     max_artifacts: int,
+    context: dict | None = None,
 ) -> BetanoDebugArtifactPaths | None:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     artifact = betano_debug_artifact_paths(
@@ -204,6 +211,7 @@ async def save_betano_debug_artifacts(
         "html_url": artifact.html_url if html_error is None else None,
         "screenshot_error": screenshot_error,
         "html_error": html_error,
+        "context": context or {},
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     Path(artifact.metadata_path).write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -270,6 +278,7 @@ async def scrape_with_playwright(
                 headless=True,
                 proxy={"server": betano_proxy_url} if betano_proxy_url else None,
                 args=[
+                    "--headless=new",
                     "--disable-blink-features=AutomationControlled",
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
@@ -665,6 +674,50 @@ async def _human_click(element, page) -> None:
     await element.click()
 
 
+async def _accept_betano_age_verification(page) -> bool:  # noqa: ANN001
+    selectors = [
+        '#age-verification-modal [data-qa="age-verification-modal-ok-button"]',
+        '#age-verification-modal button:has-text("Sim")',
+    ]
+    for selector in selectors:
+        button = page.locator(selector).first
+        try:
+            if await button.count() == 0:
+                continue
+            await _human_click(button, page)
+            try:
+                await page.locator("#age-verification-modal").wait_for(state="hidden", timeout=5000)
+            except Exception:
+                pass
+            await page.wait_for_timeout(1000)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+async def _close_betano_landing_modal(page) -> bool:  # noqa: ANN001
+    selectors = [
+        '[data-testid="landing-modal-close-button"]',
+        '[data-testid="landing-modal"] button[aria-label="Close modal"]',
+    ]
+    for selector in selectors:
+        button = page.locator(selector).first
+        try:
+            if await button.count() == 0:
+                continue
+            await _human_click(button, page)
+            try:
+                await page.locator('[data-testid="landing-modal"]').wait_for(state="hidden", timeout=5000)
+            except Exception:
+                pass
+            await page.wait_for_timeout(500)
+            return True
+        except Exception:
+            continue
+    return False
+
+
 async def scrape_betano_football(
     *,
     page,
@@ -696,14 +749,75 @@ async def scrape_betano_football(
     # Navigate to the homepage first to build a natural session/cookies,
     # then navigate to football — direct deep links from datacenter IPs get blocked.
     homepage = football_url.split("/sport/")[0] + "/"
+    homepage_status = 0
+    homepage_error = ""
+    accepted_age = False
+    closed_landing_modal = False
     try:
-        await page.goto(homepage, wait_until="domcontentloaded", timeout=15000)
+        homepage_response = await page.goto(homepage, wait_until="domcontentloaded", timeout=15000)
+        homepage_status = homepage_response.status if homepage_response else 0
         await page.wait_for_timeout(random.randint(2000, 3500))
-    except Exception:
-        pass  # Homepage may redirect or timeout, that's fine
+        accepted_age = await _accept_betano_age_verification(page)
+        closed_landing_modal = await _close_betano_landing_modal(page)
+    except Exception as exc:
+        homepage_error = str(exc)
+
+    if homepage_status in (403, 429):
+        artifact = None
+        if debug_artifacts:
+            artifact = await maybe_save_betano_debug_artifacts(
+                page=page,
+                media_root=media_root,
+                public_api_url=public_api_url,
+                label=f"homepage-http-{homepage_status}",
+                status_code=homepage_status,
+                start_url=start_url,
+                proxy_url=betano_proxy_url,
+                egress_ip=betano_egress_ip,
+                max_artifacts=debug_max_artifacts,
+                context={
+                    "stage": "homepage",
+                    "homepage_url": homepage,
+                    "accepted_age": accepted_age,
+                    "closed_landing_modal": closed_landing_modal,
+                },
+            )
+        raise ScrapeBlocked(
+            homepage_status,
+            _message_with_debug_url(
+                betano_block_message(homepage_status, betano_proxy_url, betano_egress_ip, "homepage"), artifact
+            ),
+        )
 
     # Now navigate to the actual football page
-    response = await page.goto(football_url, wait_until="domcontentloaded")
+    football_error = ""
+    try:
+        response = await page.goto(football_url, wait_until="domcontentloaded")
+    except Exception as exc:
+        football_error = str(exc)
+        artifact = None
+        if debug_artifacts:
+            artifact = await maybe_save_betano_debug_artifacts(
+                page=page,
+                media_root=media_root,
+                public_api_url=public_api_url,
+                label="football-navigation-error",
+                status_code=None,
+                start_url=start_url,
+                proxy_url=betano_proxy_url,
+                egress_ip=betano_egress_ip,
+                max_artifacts=debug_max_artifacts,
+                context={
+                    "stage": "football",
+                    "football_url": football_url,
+                    "homepage_status": homepage_status,
+                    "homepage_error": homepage_error,
+                    "accepted_age": accepted_age,
+                    "closed_landing_modal": closed_landing_modal,
+                    "navigation_error": football_error,
+                },
+            )
+        raise RuntimeError(_message_with_debug_url(f"falha ao navegar Betano futebol: {football_error}", artifact))
     status = response.status if response else 0
 
     # Retry logic: some anti-bot systems resolve after JS challenge or cookie warmup
@@ -728,14 +842,23 @@ async def scrape_betano_football(
                 proxy_url=betano_proxy_url,
                 egress_ip=betano_egress_ip,
                 max_artifacts=debug_max_artifacts,
+                context={
+                    "stage": "football",
+                    "football_url": football_url,
+                    "homepage_status": homepage_status,
+                    "homepage_error": homepage_error,
+                    "accepted_age": accepted_age,
+                    "closed_landing_modal": closed_landing_modal,
+                },
             )
         raise ScrapeBlocked(
             status,
-            _message_with_debug_url(betano_block_message(status, betano_proxy_url, betano_egress_ip), artifact),
+            _message_with_debug_url(betano_block_message(status, betano_proxy_url, betano_egress_ip, "futebol"), artifact),
         )
 
     # Simulate a human reading the page after it loads
     await page.wait_for_timeout(random.randint(2500, 4000))
+    closed_landing_modal = await _close_betano_landing_modal(page) or closed_landing_modal
 
     # Scroll down slowly to simulate reading — also triggers lazy-loaded content
     for scroll_y in (200, 450, 700):
@@ -815,6 +938,14 @@ async def scrape_betano_football(
                 proxy_url=betano_proxy_url,
                 egress_ip=betano_egress_ip,
                 max_artifacts=debug_max_artifacts,
+                context={
+                    "stage": "extract",
+                    "football_url": football_url,
+                    "homepage_status": homepage_status,
+                    "homepage_error": homepage_error,
+                    "accepted_age": accepted_age,
+                    "closed_landing_modal": closed_landing_modal,
+                },
             )
         raise RuntimeError(_message_with_debug_url(message, artifact))
 

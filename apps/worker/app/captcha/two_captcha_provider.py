@@ -28,7 +28,7 @@ class TwoCaptchaImageResolverProvider(CaptchaResolverProvider):
     def _guard(self, source_host: str) -> None:
         ensure_host_allowed(source_host, self.config.allowed_hosts, "captcha_solver")
         if not self.config.enabled:
-            raise RuntimeError("2Captcha real desativado por ENABLE_REAL_2CAPTCHA=false")
+            raise RuntimeError("Provider externo de captcha desativado por ENABLE_REAL_2CAPTCHA=false")
         if not self.config.api_key:
             raise RuntimeError("TWO_CAPTCHA_API_KEY nao configurada")
         if self.solve_count >= self.config.max_solves_per_run:

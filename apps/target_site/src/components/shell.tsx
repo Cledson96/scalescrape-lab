@@ -22,7 +22,6 @@ export function Shell({ children }: ShellProps) {
           <Link href="/protected/items?page=1">Risco</Link>
           <Link href="/external/items?page=1">Fonte externa</Link>
           <Link className="nav-primary" href="/dashboard">Dashboard</Link>
-          <Link href="/antibot/debug/session">Debug</Link>
         </nav>
       </header>
       {children}

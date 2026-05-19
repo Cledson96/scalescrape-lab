@@ -16,6 +16,8 @@ playwright-report/
 test-results/
 storage-state.json
 data/
+find_proxy.py
+*-debug/
 node_modules/
 .next/
 out/

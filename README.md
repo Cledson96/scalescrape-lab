@@ -340,7 +340,8 @@ em cooldown.
 ## Proxy Betano Via Tailscale
 
 Quando a VPS estiver com IP bloqueado para a fonte Betano, o worker pode sair
-pelo IP do seu computador usando um proxy SOCKS exposto apenas na tailnet.
+por um endpoint SOCKS exposto apenas na tailnet. Os IPs abaixo sao exemplos
+ficticios; substitua pelos enderecos reais da sua tailnet privada.
 
 No computador local, suba o proxy:
 
@@ -358,17 +359,17 @@ Descubra o IP Tailscale do computador:
 tailscale ip -4
 ```
 
-Com os dispositivos do print atual, o desktop esta em `100.81.81.109` e a VPS
-esta em `100.98.2.43`. Na VPS, teste se ela consegue usar o proxy do desktop:
+Com enderecos ficticios, considere o desktop em `100.64.0.10` e a VPS em
+`100.64.0.20`. Na VPS, teste se ela consegue usar o proxy do desktop:
 
 ```bash
-curl --socks5-hostname 100.81.81.109:1080 https://api.ipify.org
+curl --socks5-hostname 100.64.0.10:1080 https://api.ipify.org
 ```
 
 No GitHub Actions, cadastre estes secrets:
 
 ```text
-BETANO_TAILSCALE_PROXY_HOST=100.81.81.109
+BETANO_TAILSCALE_PROXY_HOST=100.64.0.10
 BETANO_TAILSCALE_PROXY_PORT=1080
 BETANO_TAILSCALE_PROXY_SCHEME=socks5
 ```
@@ -387,7 +388,7 @@ docker compose --env-file .env.production -f compose.deploy.yml exec worker prin
 O valor esperado e algo como:
 
 ```text
-socks5://100.81.81.109:1080
+socks5://100.64.0.10:1080
 ```
 
 Quando `BETANO_DEBUG_ARTIFACTS=true`, o worker salva evidencias visuais das
@@ -400,7 +401,7 @@ mudanca de markup.
 Para diagnosticar a fonte manualmente no mesmo ambiente do worker:
 
 ```bash
-docker compose run --rm -e BETANO_PROXY_URL=socks5://100.81.81.109:1080 worker python test_betano.py
+docker compose run --rm -e BETANO_PROXY_URL=socks5://100.64.0.10:1080 worker python test_betano.py
 ```
 
 O script imprime o IP de saida do navegador, testa homepage e URLs de futebol,
@@ -442,11 +443,5 @@ cd apps\target_site
 npm test
 npm run typecheck
 npm run build
-```
-
-No ambiente Codex, foi usado o Python embutido:
-
-```powershell
-& "C:\Users\user\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" -m unittest discover -s tests -v
 ```
 

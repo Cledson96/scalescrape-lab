@@ -394,23 +394,23 @@ class BetanoDiagnosticsTests(unittest.TestCase):
 
     def test_mask_proxy_url_hides_credentials(self) -> None:
         self.assertEqual(
-            mask_proxy_url("socks5://user:secret@100.81.81.109:1080"),
-            "socks5://***:***@100.81.81.109:1080",
+            mask_proxy_url("socks5://user:secret@100.64.0.10:1080"),
+            "socks5://***:***@100.64.0.10:1080",
         )
-        self.assertEqual(mask_proxy_url("socks5://100.81.81.109:1080"), "socks5://100.81.81.109:1080")
+        self.assertEqual(mask_proxy_url("socks5://100.64.0.10:1080"), "socks5://100.64.0.10:1080")
 
     def test_betano_block_message_includes_proxy_and_egress_ip(self) -> None:
         self.assertEqual(
-            betano_block_message(403, "socks5://100.81.81.109:1080", "186.214.56.189"),
-            "bloqueio HTTP 403 no Betano (proxy=socks5://100.81.81.109:1080, egress_ip=186.214.56.189)",
+            betano_block_message(403, "socks5://100.64.0.10:1080", "198.51.100.10"),
+            "bloqueio HTTP 403 no Betano (proxy=socks5://100.64.0.10:1080, egress_ip=198.51.100.10)",
         )
 
     def test_betano_block_message_can_include_navigation_stage(self) -> None:
         self.assertEqual(
-            betano_block_message(403, "socks5://100.81.81.109:1080", "186.214.56.189", "homepage"),
+            betano_block_message(403, "socks5://100.64.0.10:1080", "198.51.100.10", "homepage"),
             (
                 "bloqueio HTTP 403 no Betano durante homepage "
-                "(proxy=socks5://100.81.81.109:1080, egress_ip=186.214.56.189)"
+                "(proxy=socks5://100.64.0.10:1080, egress_ip=198.51.100.10)"
             ),
         )
 

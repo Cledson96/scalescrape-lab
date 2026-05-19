@@ -15,7 +15,7 @@ export function LoginPage({ recaptchaSiteKey, nextPath, error }: LoginPageProps)
           <h1>Portal protegido do simulador antifraude</h1>
           <p>
             Esta etapa simula um portal cadastral protegido: o worker precisa autenticar,
-            resolver o reCAPTCHA do Google e continuar a coleta.
+            validar o desafio configuravel do laboratorio e continuar a coleta.
           </p>
           <ul className="login-proof-list">
             <li>Validacao server-side de credenciais e token</li>
@@ -38,8 +38,8 @@ export function LoginPage({ recaptchaSiteKey, nextPath, error }: LoginPageProps)
 
           <section id="captcha-challenge" data-challenge-id="recaptcha" className="captcha-box">
             <div>
-              <strong>Google reCAPTCHA</strong>
-              <span>Resolvido por 2Captcha real quando habilitado, ou aceita qualquer token com chaves de teste.</span>
+              <strong>Desafio configuravel</strong>
+              <span>Fluxo controlado para validar token, sessao e continuidade da automacao.</span>
             </div>
             <div
               className="g-recaptcha"

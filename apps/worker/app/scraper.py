@@ -74,6 +74,8 @@ async def scrape_with_playwright(
     records: list[ScrapedRecord] = []
     async with async_playwright() as playwright:
         if host_from_url(start_url) == BETANO_HOST:
+            from playwright_stealth import stealth_async
+
             # Betano has bot detection — stealth browser + cookie session persistence
             session_path = str(Path(media_root) / "betano_session.json")
             storage_state = session_path if Path(session_path).exists() else None
@@ -105,14 +107,9 @@ async def scrape_with_playwright(
                 },
                 storage_state=storage_state,
             )
-            # Hide automation flags via init script
-            await betano_context.add_init_script("""
-                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3]});
-                Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt', 'en']});
-                window.chrome = {runtime: {}};
-            """)
             betano_page = await betano_context.new_page()
+            # playwright-stealth patches dozens of headless fingerprints
+            await stealth_async(betano_page)
             betano_page.set_default_timeout(page_timeout_seconds * 1000)
             try:
                 records = await scrape_betano_football(
@@ -438,8 +435,15 @@ async def scrape_betano_football(
 
     response = await page.goto(football_url, wait_until="domcontentloaded")
     status = response.status if response else 0
+
+    # Some anti-bot systems return 403 on first load but resolve via JS challenge.
+    # Wait and retry once before giving up.
     if status in (403, 429):
-        raise ScrapeBlocked(status, f"bloqueio HTTP {status} no Betano")
+        await page.wait_for_timeout(5000)
+        response = await page.reload(wait_until="domcontentloaded")
+        status = response.status if response else 0
+        if status in (403, 429):
+            raise ScrapeBlocked(status, f"bloqueio HTTP {status} no Betano")
 
     # Simulate a human reading the page after it loads
     await page.wait_for_timeout(random.randint(2500, 4000))

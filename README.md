@@ -337,6 +337,55 @@ O target-site usa esse header apenas em ambiente local para simular IPs
 diferentes e calcular risco por proxy. Proxies com muitos `403` ou `429` entram
 em cooldown.
 
+## Proxy Betano Via Tailscale
+
+Quando a VPS estiver com IP bloqueado para a fonte Betano, o worker pode sair
+pelo IP do seu computador usando um proxy SOCKS exposto apenas na tailnet.
+
+No computador local, suba o proxy:
+
+```powershell
+docker compose -f compose.tailscale-proxy.yml up -d
+```
+
+Descubra o IP Tailscale do computador:
+
+```powershell
+tailscale ip -4
+```
+
+Com os dispositivos do print atual, o desktop esta em `100.81.81.109` e a VPS
+esta em `100.98.2.43`. Na VPS, teste se ela consegue usar o proxy do desktop:
+
+```bash
+curl --socks5-hostname 100.81.81.109:1080 https://api.ipify.org
+```
+
+No GitHub Actions, cadastre estes secrets:
+
+```text
+BETANO_TAILSCALE_PROXY_HOST=100.81.81.109
+BETANO_TAILSCALE_PROXY_PORT=1080
+BETANO_TAILSCALE_PROXY_SCHEME=socks5
+```
+
+`BETANO_TAILSCALE_PROXY_PORT` e `BETANO_TAILSCALE_PROXY_SCHEME` sao opcionais;
+se ficarem vazios, o deploy assume `1080` e `socks5`. Se `BETANO_PROXY_URL`
+tambem estiver cadastrado, ele tem prioridade e o workflow nao monta a URL via
+Tailscale.
+
+Depois do deploy, confira na VPS:
+
+```bash
+docker compose --env-file .env.production -f compose.deploy.yml exec worker printenv BETANO_PROXY_URL
+```
+
+O valor esperado e algo como:
+
+```text
+socks5://100.81.81.109:1080
+```
+
 ## Regras De Seguranca
 
 Este projeto pode:
@@ -351,7 +400,7 @@ Este projeto nao faz:
 
 - bypass de Cloudflare real
 - resolucao de CAPTCHA em sites de terceiros
-- proxy rotation contra sites reais
+- proxy rotation agressiva contra sites reais
 - coleta de dados pessoais reais
 - scraping agressivo em sites reais
 - tentativa de esconder automacao de sistemas reais

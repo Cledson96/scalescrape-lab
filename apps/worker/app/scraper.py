@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 import asyncio
+import logging
 
 from app.betano import (
     build_betano_record_payload,
@@ -34,6 +35,7 @@ from app.free_proxy import get_free_working_proxy
 BETANO_HOST = "www.betano.bet.br"
 BOOKS_TO_SCRAPE_HOST = "books.toscrape.com"
 GLOBO_HOME_HOST = "www.globo.com"
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -54,6 +56,40 @@ class ScrapeBlocked(RuntimeError):
     def __init__(self, status_code: int, message: str) -> None:
         self.status_code = status_code
         super().__init__(message)
+
+
+def mask_proxy_url(proxy_url: str | None) -> str:
+    if not proxy_url:
+        return "direct"
+    parsed = urlsplit(proxy_url)
+    if not parsed.username and not parsed.password:
+        return proxy_url
+    host = parsed.hostname or ""
+    port = f":{parsed.port}" if parsed.port else ""
+    return urlunsplit((parsed.scheme, f"***:***@{host}{port}", "", "", ""))
+
+
+def betano_block_message(status_code: int, proxy_url: str | None, egress_ip: str | None = None) -> str:
+    details = [f"proxy={mask_proxy_url(proxy_url)}"]
+    if egress_ip:
+        details.append(f"egress_ip={egress_ip}")
+    return f"bloqueio HTTP {status_code} no Betano ({', '.join(details)})"
+
+
+async def read_browser_egress_ip(page, proxy_url: str | None) -> str | None:  # noqa: ANN001
+    if not proxy_url:
+        return None
+    try:
+        response = await page.goto("https://api.ipify.org?format=text", wait_until="domcontentloaded", timeout=15000)
+        status = response.status if response else 0
+        if status >= 400:
+            logger.warning("Falha ao consultar IP de saida pelo proxy Betano: HTTP %s", status)
+            return None
+        body = (await page.locator("body").inner_text(timeout=5000)).strip()
+        return body[:80] if body else None
+    except Exception as exc:  # pragma: no cover - diagnostico defensivo de rede
+        logger.warning("Falha ao consultar IP de saida pelo proxy Betano: %s", exc)
+        return None
 
 
 async def scrape_with_playwright(
@@ -170,6 +206,13 @@ async def scrape_with_playwright(
             """)
             betano_page = await betano_context.new_page()
             betano_page.set_default_timeout(page_timeout_seconds * 1000)
+            betano_egress_ip = await read_browser_egress_ip(betano_page, betano_proxy_url)
+            logger.info(
+                "Betano browser configurado com proxy=%s egress_ip=%s storage_state=%s",
+                mask_proxy_url(betano_proxy_url),
+                betano_egress_ip or "desconhecido",
+                "sim" if storage_state else "nao",
+            )
             try:
                 records = await scrape_betano_football(
                     page=betano_page,
@@ -178,6 +221,8 @@ async def scrape_with_playwright(
                     proxy=proxy,
                     max_leagues=betano_max_leagues,
                     session_path=session_path,
+                    betano_proxy_url=betano_proxy_url,
+                    betano_egress_ip=betano_egress_ip,
                 )
             finally:
                 await betano_browser.close()
@@ -477,6 +522,8 @@ async def scrape_betano_football(
     proxy: ProxyProfileState,
     max_leagues: int = 10,
     session_path: str = "",
+    betano_proxy_url: str | None = None,
+    betano_egress_ip: str | None = None,
 ) -> list[ScrapedRecord]:
     """Scrape football odds from Betano's POPULARES section.
 
@@ -515,7 +562,7 @@ async def scrape_betano_football(
         status = response.status if response else 0
 
     if status in (403, 429):
-        raise ScrapeBlocked(status, f"bloqueio HTTP {status} no Betano")
+        raise ScrapeBlocked(status, betano_block_message(status, betano_proxy_url, betano_egress_ip))
 
     # Simulate a human reading the page after it loads
     await page.wait_for_timeout(random.randint(2500, 4000))

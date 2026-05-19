@@ -66,7 +66,7 @@ from app.globo import (  # noqa: E402
     parse_globo_home_cards,
 )
 from app.schedule import scheduled_scrape_jobs  # noqa: E402
-from app.scraper import LoginCredentials, handle_login_if_present  # noqa: E402
+from app.scraper import LoginCredentials, betano_block_message, handle_login_if_present, mask_proxy_url  # noqa: E402
 
 PolicyError = worker_policy.PolicyError
 ensure_host_allowed = worker_policy.ensure_host_allowed
@@ -335,6 +335,21 @@ class ScheduledScrapeTests(unittest.TestCase):
         self.assertEqual(jobs[3]["start_url"], "https://www.betano.bet.br/sport/futebol/")
         self.assertTrue(all(job["mode"] == "browser" for job in jobs))
         self.assertTrue(all(job["interval_seconds"] == 21600 for job in jobs))
+
+
+class BetanoDiagnosticsTests(unittest.TestCase):
+    def test_mask_proxy_url_hides_credentials(self) -> None:
+        self.assertEqual(
+            mask_proxy_url("socks5://user:secret@100.81.81.109:1080"),
+            "socks5://***:***@100.81.81.109:1080",
+        )
+        self.assertEqual(mask_proxy_url("socks5://100.81.81.109:1080"), "socks5://100.81.81.109:1080")
+
+    def test_betano_block_message_includes_proxy_and_egress_ip(self) -> None:
+        self.assertEqual(
+            betano_block_message(403, "socks5://100.81.81.109:1080", "186.214.56.189"),
+            "bloqueio HTTP 403 no Betano (proxy=socks5://100.81.81.109:1080, egress_ip=186.214.56.189)",
+        )
 
 
 class GloboParserTests(unittest.TestCase):

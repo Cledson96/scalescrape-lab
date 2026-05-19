@@ -486,17 +486,30 @@ async def scrape_betano_football(
     if not football_url.rstrip("/").endswith("/sport/futebol"):
         football_url = start_url.rstrip("/") + "/sport/futebol/"
 
+    # Navigate to the homepage first to build a natural session/cookies,
+    # then navigate to football — direct deep links from datacenter IPs get blocked.
+    homepage = football_url.split("/sport/")[0] + "/"
+    try:
+        await page.goto(homepage, wait_until="domcontentloaded", timeout=15000)
+        await page.wait_for_timeout(random.randint(2000, 3500))
+    except Exception:
+        pass  # Homepage may redirect or timeout, that's fine
+
+    # Now navigate to the actual football page
     response = await page.goto(football_url, wait_until="domcontentloaded")
     status = response.status if response else 0
 
-    # Some anti-bot systems return 403 on first load but resolve via JS challenge.
-    # Wait and retry once before giving up.
-    if status in (403, 429):
-        await page.wait_for_timeout(5000)
+    # Retry logic: some anti-bot systems resolve after JS challenge or cookie warmup
+    for attempt in range(3):
+        if status not in (403, 429):
+            break
+        wait_ms = (attempt + 1) * 5000  # 5s, 10s, 15s
+        await page.wait_for_timeout(wait_ms)
         response = await page.reload(wait_until="domcontentloaded")
         status = response.status if response else 0
-        if status in (403, 429):
-            raise ScrapeBlocked(status, f"bloqueio HTTP {status} no Betano")
+
+    if status in (403, 429):
+        raise ScrapeBlocked(status, f"bloqueio HTTP {status} no Betano")
 
     # Simulate a human reading the page after it loads
     await page.wait_for_timeout(random.randint(2500, 4000))

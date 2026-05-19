@@ -74,8 +74,6 @@ async def scrape_with_playwright(
     records: list[ScrapedRecord] = []
     async with async_playwright() as playwright:
         if host_from_url(start_url) == BETANO_HOST:
-            from playwright_stealth import stealth_async
-
             # Betano has bot detection — stealth browser + cookie session persistence
             session_path = str(Path(media_root) / "betano_session.json")
             storage_state = session_path if Path(session_path).exists() else None
@@ -107,9 +105,64 @@ async def scrape_with_playwright(
                 },
                 storage_state=storage_state,
             )
+            # Comprehensive stealth: patch all major headless fingerprints
+            await betano_context.add_init_script("""
+                // Hide webdriver flag
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+
+                // Fake chrome runtime (real Chrome always has this)
+                window.chrome = {runtime: {}, loadTimes: function(){}, csi: function(){}};
+
+                // Fake plugins (headless has 0 plugins)
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [
+                        {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer'},
+                        {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
+                        {name: 'Native Client', filename: 'internal-nacl-plugin'},
+                    ],
+                });
+
+                // Fake languages
+                Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt', 'en-US', 'en']});
+
+                // Fake permissions API (headless denies all)
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) =>
+                    parameters.name === 'notifications'
+                        ? Promise.resolve({state: Notification.permission})
+                        : originalQuery(parameters);
+
+                // Fix iframe contentWindow detection
+                const origGetter = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow').get;
+                Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+                    get: function() {
+                        const result = origGetter.call(this);
+                        if (!result) return result;
+                        try { result.chrome = window.chrome; } catch(e) {}
+                        return result;
+                    }
+                });
+
+                // Fake WebGL renderer (headless shows "Google SwiftShader")
+                const getParameter = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                    if (parameter === 37445) return 'Intel Inc.';
+                    if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+                    return getParameter.call(this, parameter);
+                };
+
+                // Fake connection (headless shows odd rtt values)
+                Object.defineProperty(navigator, 'connection', {
+                    get: () => ({effectiveType: '4g', rtt: 50, downlink: 10, saveData: false}),
+                });
+
+                // Fake hardwareConcurrency (headless often shows 1 or 2)
+                Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
+
+                // Fake platform
+                Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});
+            """)
             betano_page = await betano_context.new_page()
-            # playwright-stealth patches dozens of headless fingerprints
-            await stealth_async(betano_page)
             betano_page.set_default_timeout(page_timeout_seconds * 1000)
             try:
                 records = await scrape_betano_football(

@@ -161,7 +161,7 @@ salva `image_public_path` em `raw_data`.
 Visualmente, a rota `/dashboard` do target-site mostra:
 
 - tabela de jobs recentes;
-- tabelas paginadas separadas para fake-target, Books to Scrape e Globo;
+- tabelas paginadas separadas para fake-target, Books to Scrape, Globo e Betano;
 - `public_url` para o dominio publico da demo;
 - thumbnails da Globo servidas pela API;
 - botoes para consultar agora cada fonte ou todas juntas.
@@ -175,11 +175,12 @@ https://dev.scalescrape.cledson.com.br/dashboard
 ## Agendamento A Cada 6 Horas
 
 O projeto inclui um servico `scheduler` com Celery Beat. Ele funciona como um
-cron job e dispara automaticamente, a cada 6 horas, tres scrapings de demo:
+cron job e dispara automaticamente, a cada 6 horas, quatro scrapings de demo:
 
 - `fake-target`: `http://target-site:4000/protected/items?page=1`
 - `books-to-scrape`: `https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html`
 - `globo-home`: `https://www.globo.com/`
+- `betano-football`: `https://www.betano.bet.br/sport/futebol/`
 
 Configuracao:
 
@@ -193,6 +194,7 @@ SCHEDULED_SCRAPE_INTERVAL_SECONDS=21600
 SCHEDULED_PROTECTED_TARGET_URL=http://target-site:4000/protected/items?page=1
 SCHEDULED_BOOKS_TO_SCRAPE_URL=https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
 SCHEDULED_GLOBO_HOME_URL=https://www.globo.com/
+SCHEDULED_BETANO_FOOTBALL_URL=https://www.betano.bet.br/sport/futebol/
 GLOBO_MAX_ARTICLES=12
 ```
 

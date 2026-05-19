@@ -40,11 +40,12 @@ publica a tarefa `app.jobs.tasks.run_scrape_job` na fila `scrape.jobs`.
 
 Tambem existe o fluxo automatico: o servico `scheduler`, rodando Celery Beat,
 dispara `app.jobs.tasks.enqueue_scheduled_scrape_jobs` a cada 21600 segundos
-(6 horas). Essa tarefa cria tres jobs:
+(6 horas). Essa tarefa cria quatro jobs:
 
 - target protegido do laboratorio;
 - Books to Scrape na categoria Science Fiction;
 - Globo Home para noticias publicas da home.
+- Betano Football para odds de futebol salvas pelo scraper dedicado.
 
 Para demonstrar um segundo scraping externo seguro, use a fonte
 `books-to-scrape`:
@@ -149,6 +150,13 @@ Na Globo, o worker usa um adaptador dedicado:
 - baixa imagens permitidas de `*.glbimg.com` para `MEDIA_ROOT/globo`;
 - grava `image_public_path` para que a API sirva a thumbnail em `/media`.
 
+Na Betano, o worker usa uma fonte dedicada para futebol:
+
+- tenta primeiro o endpoint de dados esportivos usado pela propria pagina;
+- quando necessario, usa Playwright para carregar a experiencia visual;
+- salva campeonato, jogo, horario, mercado e odds em `raw_data.odds`;
+- registra diagnosticos de bloqueio e artefatos de debug quando habilitados.
+
 ## 6. Persistencia E Status
 
 Ao final, os dados vao para `scraped_items`. O campo `created_at` e exposto pela
@@ -177,9 +185,9 @@ GET /jobs/{job_id}/items
 Tambem ha uma vitrine visual em `/dashboard` no target-site. Ela consulta a API
 server-side por `SCALESCRAPE_API_URL`, mostra `public_url`/`public_detail_url`
 para trocar `http://target-site:4000` pelo dominio publico do ambiente, e possui
-botoes para criar jobs imediatos dos tres scrapers. O dashboard mostra tabelas
-paginadas separadas para fake-target, Books to Scrape e Globo; as imagens da
-Globo sao servidas pela API com `PUBLIC_API_URL`.
+botoes para criar jobs imediatos dos quatro scrapers. O dashboard mostra tabelas
+paginadas em abas para fake-target, Books to Scrape, Globo e Betano; as imagens
+da Globo sao servidas pela API com `PUBLIC_API_URL`.
 
 O target-site tambem tem uma fonte dinamica propria: `/external/items` busca a
 API real RandomUser, normaliza os dados sem expor e-mail/telefone/documento, usa

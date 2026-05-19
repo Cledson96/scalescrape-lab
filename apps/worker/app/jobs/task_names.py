@@ -1,3 +1,3 @@
-RUN_SCRAPE_TASK = "app.jobs.tasks.run_scrape_job"
-ENQUEUE_SCHEDULED_TASK = "app.jobs.tasks.enqueue_scheduled_scrape_jobs"
-DEAD_LETTER_TASK = "app.jobs.tasks.dead_letter_scrape_job"
+from scalescrape_contracts.task_names import DEAD_LETTER_TASK, ENQUEUE_SCHEDULED_TASK, RUN_SCRAPE_TASK
+
+__all__ = ["DEAD_LETTER_TASK", "ENQUEUE_SCHEDULED_TASK", "RUN_SCRAPE_TASK"]

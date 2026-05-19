@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
+from scalescrape_contracts.clock import utc_now_naive
 
-
-def utc_now_naive() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+__all__ = ["utc_now_naive"]

@@ -1,8 +1,7 @@
 from celery import Celery
+from scalescrape_contracts.task_names import RUN_SCRAPE_TASK
 
 from app.settings import get_settings
-
-RUN_SCRAPE_TASK = "app.jobs.tasks.run_scrape_job"
 
 
 def make_celery() -> Celery:

@@ -23,6 +23,7 @@ def enable_proxy(session: Session, proxy_id: int) -> ProxyProfile:
     proxy.status = "active"
     proxy.cooldown_until = None
     session.commit()
+    session.refresh(proxy)
     return proxy
 
 
@@ -30,6 +31,7 @@ def disable_proxy(session: Session, proxy_id: int) -> ProxyProfile:
     proxy = get_proxy_or_raise(session, proxy_id)
     proxy.status = "disabled"
     session.commit()
+    session.refresh(proxy)
     return proxy
 
 
@@ -38,4 +40,5 @@ def cooldown_proxy(session: Session, proxy_id: int) -> ProxyProfile:
     proxy.status = "cooldown"
     proxy.cooldown_until = datetime.utcnow() + timedelta(minutes=5)
     session.commit()
+    session.refresh(proxy)
     return proxy

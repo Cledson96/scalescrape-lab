@@ -69,6 +69,7 @@ class ApiContractTests(unittest.TestCase):
         import app.services.sources as source_service
 
         Base.metadata.create_all(bind=engine)
+        self.engine = engine
         self.SessionLocal = SessionLocal
         self.JobCreate = JobCreate
         self.services = types.SimpleNamespace(
@@ -90,6 +91,9 @@ class ApiContractTests(unittest.TestCase):
         job_service.enqueue_scrape_job = self.enqueued_jobs.append
 
     def tearDown(self) -> None:
+        engine = getattr(self, "engine", None)
+        if engine is not None:
+            engine.dispose()
         for name in [name for name in sys.modules if name == "app" or name.startswith("app.")]:
             sys.modules.pop(name, None)
         sys.modules.update(self.saved_modules)

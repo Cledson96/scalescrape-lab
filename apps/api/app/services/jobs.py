@@ -66,5 +66,6 @@ def retry_scrape_job(session: Session, job_id: int) -> Job:
         )
     )
     session.commit()
+    session.refresh(job)
     enqueue_scrape_job(job.id)
     return job

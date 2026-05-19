@@ -59,6 +59,7 @@ def pause_source(session: Session, source_id: int) -> Source:
     source.status = "paused"
     source.circuit_open_until = None
     session.commit()
+    session.refresh(source)
     return source
 
 
@@ -69,4 +70,5 @@ def resume_source(session: Session, source_id: int) -> Source:
     source.status = "active"
     source.circuit_open_until = None
     session.commit()
+    session.refresh(source)
     return source

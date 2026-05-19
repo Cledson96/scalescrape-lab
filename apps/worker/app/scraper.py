@@ -73,6 +73,60 @@ async def scrape_with_playwright(
 
     records: list[ScrapedRecord] = []
     async with async_playwright() as playwright:
+        if host_from_url(start_url) == BETANO_HOST:
+            # Betano has bot detection — stealth browser + cookie session persistence
+            session_path = str(Path(media_root) / "betano_session.json")
+            storage_state = session_path if Path(session_path).exists() else None
+
+            betano_browser = await playwright.chromium.launch(
+                headless=True,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-infobars",
+                    "--window-size=1280,800",
+                ],
+            )
+            betano_context = await betano_browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                viewport={"width": 1280, "height": 800},
+                locale="pt-BR",
+                timezone_id="America/Sao_Paulo",
+                extra_http_headers={
+                    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "none",
+                },
+                storage_state=storage_state,
+            )
+            # Hide automation flags via init script
+            await betano_context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3]});
+                Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt', 'en']});
+                window.chrome = {runtime: {}};
+            """)
+            betano_page = await betano_context.new_page()
+            betano_page.set_default_timeout(page_timeout_seconds * 1000)
+            try:
+                records = await scrape_betano_football(
+                    page=betano_page,
+                    context=betano_context,
+                    start_url=start_url,
+                    proxy=proxy,
+                    max_leagues=betano_max_leagues,
+                    session_path=session_path,
+                )
+            finally:
+                await betano_browser.close()
+            return records
+
         browser = await playwright.chromium.launch(headless=True)
         context = await browser.new_context(
             extra_http_headers={"X-Lab-Proxy-Id": proxy.name},
@@ -80,15 +134,6 @@ async def scrape_with_playwright(
         )
         page = await context.new_page()
         page.set_default_timeout(page_timeout_seconds * 1000)
-        if host_from_url(start_url) == BETANO_HOST:
-            records = await scrape_betano_football(
-                page=page,
-                start_url=start_url,
-                proxy=proxy,
-                max_leagues=betano_max_leagues,
-            )
-            await browser.close()
-            return records
 
         if host_from_url(start_url) == BOOKS_TO_SCRAPE_HOST:
             records = await scrape_books_to_scrape(
@@ -355,18 +400,35 @@ async def download_globo_image(*, page, image_url: str, external_id: str, media_
     return image_path, image_public_path
 
 
+async def _human_click(element, page) -> None:
+    """Simulate a human-like click: scroll into view, hover, random delay, then click.
+
+    This makes interactions harder to fingerprint as automated bot behavior.
+    """
+    import random
+    await element.scroll_into_view_if_needed()
+    await page.wait_for_timeout(random.randint(200, 500))
+    await element.hover()
+    await page.wait_for_timeout(random.randint(100, 350))
+    await element.click()
+
+
 async def scrape_betano_football(
     *,
     page,
+    context,
     start_url: str,
     proxy: ProxyProfileState,
     max_leagues: int = 10,
+    session_path: str = "",
 ) -> list[ScrapedRecord]:
     """Scrape football odds from Betano's POPULARES section.
 
     Navigates to the football page, iterates through each popular league tab,
     and collects match data with 1/X/2 odds for each visible game.
+    Uses human-like interactions and persists session cookies between runs.
     """
+    import random
     import re
     from datetime import datetime, timezone
 
@@ -374,26 +436,40 @@ async def scrape_betano_football(
     if not football_url.rstrip("/").endswith("/sport/futebol"):
         football_url = start_url.rstrip("/") + "/sport/futebol/"
 
-    response = await page.goto(football_url, wait_until="networkidle")
+    response = await page.goto(football_url, wait_until="domcontentloaded")
     status = response.status if response else 0
     if status in (403, 429):
         raise ScrapeBlocked(status, f"bloqueio HTTP {status} no Betano")
 
-    # Wait for the POPULARES section to render
-    await page.wait_for_timeout(4000)
+    # Simulate a human reading the page after it loads
+    await page.wait_for_timeout(random.randint(2500, 4000))
+
+    # Scroll down slowly to simulate reading — also triggers lazy-loaded content
+    for scroll_y in (200, 450, 700):
+        await page.evaluate(f"window.scrollTo({{top: {scroll_y}, behavior: 'smooth'}})")
+        await page.wait_for_timeout(random.randint(300, 600))
+    # Scroll back up to the POPULARES section
+    await page.evaluate("window.scrollTo({top: 0, behavior: 'smooth'})")
+    await page.wait_for_timeout(random.randint(400, 800))
+
+    # Save session cookies after first successful page load
+    if session_path:
+        try:
+            Path(session_path).parent.mkdir(parents=True, exist_ok=True)
+            await context.storage_state(path=session_path)
+        except Exception:
+            pass
 
     records: list[ScrapedRecord] = []
 
-    # Find league tabs - they are clickable elements with league names
-    # near the POPULARES heading. Betano uses div/span/a elements as tabs.
     league_keywords = [
         "brasileir", "premier", "libertadores", "serie",
         "copa", "league", "bundesliga", "liga", "ligue",
         "championship", "sul-american", "feminino", "nbb",
-        "la liga", "serie a", "eredivisie", "championship",
+        "la liga", "serie a", "eredivisie",
     ]
 
-    # Strategy: find all clickable elements and filter by league-name keywords
+    # Find all clickable elements and filter by league-name keywords
     all_clickables = page.locator(
         'div[role="button"], button, a[role="tab"], '
         '[class*="league"] div, [class*="pill"], [class*="chip"], [class*="tab-item"]'
@@ -405,7 +481,6 @@ async def scrape_betano_football(
         try:
             text = (await el.inner_text(timeout=2000)).strip()
             if text and any(kw in text.lower() for kw in league_keywords):
-                # Avoid duplicates and non-tab elements (like full match cards)
                 if len(text) < 60:
                     league_tabs.append((el, text))
         except Exception:
@@ -428,8 +503,10 @@ async def scrape_betano_football(
         extracted_at = datetime.now(timezone.utc).isoformat()
 
         try:
-            await tab_el.click()
-            await page.wait_for_timeout(2500)
+            # Human-like click: scroll → hover → random delay → click
+            await _human_click(tab_el, page)
+            # Random wait between tabs (1.5s–3.5s) like a human reading content
+            await page.wait_for_timeout(random.randint(1500, 3500))
 
             market_type = "Resultado da partida"
 

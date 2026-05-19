@@ -17,7 +17,7 @@ export function ItemsPage({ title, subtitle, page, route, detailRoute }: ItemsPa
         <span className="eyebrow">consulta operacional</span>
         <h1>{title}</h1>
         <p>
-          {subtitle} Pagina {page.pageNumber} de {page.totalPages}, {page.total} registros.
+          {subtitle} Pagina {page.pageNumber} de {page.totalPages}, {page.total} registros sinteticos para extracao segura.
         </p>
       </section>
       <main className="content">
@@ -30,9 +30,9 @@ export function ItemsPage({ title, subtitle, page, route, detailRoute }: ItemsPa
               </div>
               <h2 className="item-title">{record.title}</h2>
               <div className="item-meta">
-                <span>{record.category}</span>
-                <span>{record.region}</span>
-                <span>score de risco: {record.riskScore}</span>
+                <span><strong>Categoria</strong>{record.category}</span>
+                <span><strong>Regiao</strong>{record.region}</span>
+                <span><strong>Score</strong>{record.riskScore}</span>
                 {record.fetchedAt ? <span>extraido em: {new Date(record.fetchedAt).toLocaleString("pt-BR")}</span> : null}
               </div>
               <div className="risk" aria-hidden="true">

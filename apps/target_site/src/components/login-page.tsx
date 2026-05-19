@@ -12,11 +12,16 @@ export function LoginPage({ recaptchaSiteKey, nextPath, error }: LoginPageProps)
       <section className="login-panel">
         <div>
           <span className="eyebrow">acesso protegido</span>
-          <h1>Login do simulador antifraude</h1>
+          <h1>Portal protegido do simulador antifraude</h1>
           <p>
             Esta etapa simula um portal cadastral protegido: o worker precisa autenticar,
             resolver o reCAPTCHA do Google e continuar a coleta.
           </p>
+          <ul className="login-proof-list">
+            <li>Validacao server-side de credenciais e token</li>
+            <li>Cookie de sessao antes das rotas protegidas</li>
+            <li>Fluxo realista para Playwright e politica anti-bot</li>
+          </ul>
         </div>
         <form id="login-form" className="login-form" action="/login/submit" method="post">
           <input type="hidden" name="next" value={nextPath} />
@@ -50,4 +55,3 @@ export function LoginPage({ recaptchaSiteKey, nextPath, error }: LoginPageProps)
     </main>
   );
 }
-

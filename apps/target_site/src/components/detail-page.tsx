@@ -28,6 +28,9 @@ export function DetailPage({ record }: DetailPageProps) {
         <h1>Detalhe {record.externalId}</h1>
         <h2>{record.title}</h2>
         <p className="status">{record.category} em {record.region}</p>
+        <div className="risk detail-risk" aria-hidden="true">
+          <span style={{ width: `${Math.max(4, Math.min(100, record.riskScore))}%` }} />
+        </div>
         <p>{record.rawSummary}</p>
         <a className="detail-link" href="/items?page=1">Voltar para dataset</a>
       </section>

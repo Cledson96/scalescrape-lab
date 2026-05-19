@@ -7,30 +7,30 @@ type HomePageProps = {
 
 const scenarios = [
   {
-    title: "Dataset publico",
+    title: "Dataset publico controlado",
     href: "/items?page=1",
-    description: "Consulta estavel para scraping paginado com seletores previsiveis.",
+    description: "Consulta estavel, paginada e deterministica para validar throughput sem depender de terceiros.",
     tag: "200 OK",
     tone: "green"
   },
   {
-    title: "Monitoramento anti-fraude",
+    title: "Portal protegido anti-fraude",
     href: "/protected/items?page=1",
-    description: "Sessao, score de risco, delay e challenge local para simular protecao.",
+    description: "Login, cookies, score de risco, delay e challenge local para provar dominio de sessao.",
     tag: "policy",
     tone: "blue"
   },
   {
-    title: "Massa fake externa",
+    title: "Massa externa normalizada",
     href: "/external/items?page=1",
-    description: "RandomUser normalizado como dados cadastrais sinteticos com fallback.",
+    description: "Payload externo convertido em registros sinteticos, sem expor contato ou documento.",
     tag: "bulk data",
     tone: "green"
   },
   {
-    title: "Dashboard de extracao",
+    title: "Centro de comando",
     href: "/dashboard",
-    description: "Tabelas das quatro fontes salvas no banco e botoes para executar coletas agora.",
+    description: "Tabelas das quatro fontes, disparo de jobs e visao operacional para apresentar a arquitetura.",
     tag: "Postgres",
     tone: "blue"
   },
@@ -62,29 +62,35 @@ export function HomePage({ localTotal, externalTotal }: HomePageProps) {
     <>
       <section className="hero">
         <div className="hero-copy">
-          <span className="eyebrow">inspirado em protecao ao credito e prevencao a fraudes</span>
+          <span className="eyebrow">case autoral para scraping, risco e monitoramento continuo</span>
           <h1>Controle riscos e fraudes em um laboratorio de scraping observavel</h1>
           <p>
-            Um target-site local para demonstrar coleta em escala, monitoramento continuo, sinais de risco e
-            politicas de seguranca sem tocar em dados pessoais reais.
+            Uma vitrine tecnica inspirada em plataformas de protecao ao credito: coleta em escala, dominio de HTTP,
+            workers paralelos, sinais de risco e politicas anti-bot sem tocar em dados pessoais reais.
           </p>
           <div className="hero-actions">
-            <a className="primary-action" href="/items?page=1">Testar dataset</a>
-            <a className="secondary-action" href="/dashboard">Ver dashboard</a>
+            <a className="primary-action" href="/dashboard">Abrir centro de comando</a>
+            <a className="secondary-action" href="/items?page=1">Testar dataset</a>
           </div>
         </div>
         <div className="status-board" aria-label="Resumo do laboratorio">
+          <div className="status-card wide">
+            <span>pipeline demonstrado</span>
+            <strong>API + RabbitMQ + Workers + Postgres</strong>
+            <p>Fluxo completo para falar de latencia, throughput, retry, timeout e observabilidade.</p>
+          </div>
           <div className="metric"><strong>{localTotal}</strong><span>registros locais</span></div>
           <div className="metric"><strong>{externalTotal}</strong><span>registros fake externos</span></div>
-          <div className="metric"><strong>6</strong><span>cenarios de teste</span></div>
+          <div className="metric"><strong>7</strong><span>cenarios de teste</span></div>
           <div className="metric"><strong>0</strong><span>dados pessoais reais</span></div>
         </div>
       </section>
       <main className="content">
         <div className="section-head">
           <div>
+            <span className="section-kicker">ambiente de entrevista</span>
             <h2>Simulador cadastral e antifraude</h2>
-            <p>Rotas prontas para API, worker, Playwright, retry, DLQ e observabilidade.</p>
+            <p>Rotas prontas para API, worker, Playwright, retry, DLQ, proxy policy e observabilidade.</p>
           </div>
         </div>
         <section className="scenario-grid">

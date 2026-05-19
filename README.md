@@ -375,8 +375,8 @@ BETANO_TAILSCALE_PROXY_SCHEME=socks5
 
 `BETANO_TAILSCALE_PROXY_PORT` e `BETANO_TAILSCALE_PROXY_SCHEME` sao opcionais;
 se ficarem vazios, o deploy assume `1080` e `socks5`. Se `BETANO_PROXY_URL`
-tambem estiver cadastrado, ele tem prioridade e o workflow nao monta a URL via
-Tailscale.
+estiver vazio ou como `auto`, o workflow monta a URL via Tailscale. Se
+`BETANO_PROXY_URL` tiver uma URL completa, ela tem prioridade.
 
 Depois do deploy, confira na VPS:
 

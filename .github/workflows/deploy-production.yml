@@ -141,7 +141,7 @@ jobs:
             if [ -z "${API_PORT:-}" ]; then API_PORT=8000; fi
             if [ -z "${GRAFANA_PORT:-}" ]; then GRAFANA_PORT=3000; fi
             if [ -z "${RABBITMQ_MANAGEMENT_PORT:-}" ]; then RABBITMQ_MANAGEMENT_PORT=11573; fi
-            if [ -z "${BETANO_PROXY_URL:-}" ] && [ -n "${BETANO_TAILSCALE_PROXY_HOST:-}" ]; then
+            if { [ -z "${BETANO_PROXY_URL:-}" ] || [ "${BETANO_PROXY_URL:-}" = "auto" ]; } && [ -n "${BETANO_TAILSCALE_PROXY_HOST:-}" ]; then
               if [ -z "${BETANO_TAILSCALE_PROXY_PORT:-}" ]; then BETANO_TAILSCALE_PROXY_PORT=1080; fi
               if [ -z "${BETANO_TAILSCALE_PROXY_SCHEME:-}" ]; then BETANO_TAILSCALE_PROXY_SCHEME=socks5; fi
               BETANO_PROXY_URL="${BETANO_TAILSCALE_PROXY_SCHEME}://${BETANO_TAILSCALE_PROXY_HOST}:${BETANO_TAILSCALE_PROXY_PORT}"

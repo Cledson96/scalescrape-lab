@@ -23,6 +23,42 @@ const dashboardTabs: Array<{ key: DashboardTab; label: string; description: stri
   { key: "betano", label: "Betano", description: "Odds reais do scraper" }
 ];
 
+const casePillars = [
+  {
+    title: "Desenvolvimento e performance",
+    body: "Pipeline com API, jobs persistidos, retry, timeout, Playwright e workers paralelos para simular alta volumetria.",
+    tags: ["Python", "Next.js", "Playwright"]
+  },
+  {
+    title: "Infraestrutura e rede",
+    body: "Controle de sessao, cookies, rate limit, proxy, captcha em laboratorio proprio e politicas de whitelist para execucao segura.",
+    tags: ["HTTP", "cookies", "proxy policy"]
+  },
+  {
+    title: "Operacao distribuida",
+    body: "RabbitMQ, Postgres, Prometheus, Grafana, Docker e deploy automatizado para mostrar observabilidade de ponta a ponta.",
+    tags: ["RabbitMQ", "Postgres", "Grafana"]
+  }
+];
+
+const architectureSteps = [
+  "Target Next.js",
+  "API FastAPI",
+  "RabbitMQ",
+  "Workers Playwright",
+  "Postgres",
+  "Prometheus + Grafana",
+  "Docker + GitHub Actions"
+];
+
+const scrapeActions = [
+  { source: "fake-target", label: "Consultar fake agora", detail: "Login, captcha e sessao" },
+  { source: "books-to-scrape", label: "Consultar Books agora", detail: "Preco, nota e descricao" },
+  { source: "globo-home", label: "Consultar Globo agora", detail: "Noticias e imagens" },
+  { source: "betano-football", label: "Consultar Betano agora", detail: "Odds de futebol" },
+  { source: "all", label: "Consultar todos agora", detail: "Executa as quatro fontes" }
+] as const;
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
@@ -390,49 +426,104 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
   const latestSuccess = lastSuccess(jobs);
   const pages = { fakeItems, booksItems, globoItems, betanoItems };
   const visibleItems = fakeItems.total + booksItems.total + globoItems.total + betanoItems.total || items.length;
+  const successRate = jobs.length > 0 ? `${Math.round((successCount / jobs.length) * 100)}%` : "0%";
 
   return (
     <>
-      <section className="list-hero dashboard-hero">
-        <span className="eyebrow">painel operacional</span>
-        <h1>Dados extraidos pelo ScaleScrape</h1>
-        <p>
-          Acompanhe jobs, veja registros persistidos no Postgres e dispare consultas imediatas nos quatro alvos.
-        </p>
+      <section className="dashboard-hero">
+        <div className="case-hero-copy">
+          <span className="eyebrow">Case tecnico autoral para vaga Procob</span>
+          <h1>Scraping distribuido em escala</h1>
+          <p>
+            Uma iniciativa propria para demonstrar competencias em coleta de dados, mensageria, workers paralelos,
+            controle de sessao, observabilidade e deploy automatizado em um cenario inspirado em protecao ao credito
+            e prevencao a fraudes.
+          </p>
+          <div className="case-badge-row" aria-label="Competencias demonstradas">
+            <span>HTTP, headers e cookies</span>
+            <span>Retry, timeout e throughput</span>
+            <span>Monitoramento de workers</span>
+            <span>Docker na VPS</span>
+          </div>
+        </div>
+        <aside className="case-snapshot" aria-label="Resumo da stack">
+          <span>Stack e arquitetura</span>
+          <strong>Pipeline completo, observavel e pronto para demo</strong>
+          <ul>
+            <li>RabbitMQ para distribuir jobs</li>
+            <li>Workers Playwright para paginas dinamicas</li>
+            <li>Postgres para historico dos dados extraidos</li>
+            <li>Docker + GitHub Actions para deploy dev/main</li>
+          </ul>
+        </aside>
       </section>
 
       <main className="content dashboard-content">
         {apiError ? <div className="dashboard-alert">API indisponivel: {apiError}</div> : null}
         {createdJobs ? <div className="dashboard-alert success">Jobs criados agora: {createdJobs}</div> : null}
 
-        <section className="dashboard-actions" aria-label="Criar scraping agora">
-          <form action="/dashboard/run" method="post">
-            <input type="hidden" name="source" value="fake-target" />
-            <button type="submit">Consultar fake agora</button>
-          </form>
-          <form action="/dashboard/run" method="post">
-            <input type="hidden" name="source" value="books-to-scrape" />
-            <button type="submit">Consultar Books agora</button>
-          </form>
-          <form action="/dashboard/run" method="post">
-            <input type="hidden" name="source" value="globo-home" />
-            <button type="submit">Consultar Globo agora</button>
-          </form>
-          <form action="/dashboard/run" method="post">
-            <input type="hidden" name="source" value="betano-football" />
-            <button type="submit">Consultar Betano agora</button>
-          </form>
-          <form action="/dashboard/run" method="post">
-            <input type="hidden" name="source" value="all" />
-            <button type="submit">Consultar todos agora</button>
-          </form>
-          <a className="secondary-dashboard-action" href="/dashboard">Atualizar painel</a>
+        <section className="case-brief" aria-label="Como este case conversa com a vaga">
+          <div className="section-head">
+            <div>
+              <h2>Case criado para demonstrar fit tecnico</h2>
+              <p>O foco e mostrar investigacao, escala, rede, automacao e operacao, nao apenas uma tela bonita.</p>
+            </div>
+          </div>
+          <div className="case-brief-grid">
+            {casePillars.map((pillar) => (
+              <article className="case-pillar" key={pillar.title}>
+                <h3>{pillar.title}</h3>
+                <p>{pillar.body}</p>
+                <div className="tag-row">
+                  {pillar.tags.map((tag) => <span className="tag blue" key={tag}>{tag}</span>)}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="architecture-strip" aria-label="Arquitetura do scraping distribuido">
+          {architectureSteps.map((step, index) => (
+            <div className="architecture-step" key={step}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <strong>{step}</strong>
+            </div>
+          ))}
+        </section>
+
+        <section className="dashboard-control-panel" aria-label="Criar scraping agora">
+          <div className="control-copy">
+            <span className="eyebrow">operacao ao vivo</span>
+            <h2>Dispare coletas e acompanhe a persistencia</h2>
+            <p>
+              Cada botao cria jobs na API, envia o trabalho para a fila e deixa o worker salvar os dados extraidos
+              no Postgres para aparecerem nas tabelas abaixo.
+            </p>
+          </div>
+          <div className="dashboard-actions">
+            {scrapeActions.map((action) => (
+              <form action="/dashboard/run" method="post" key={action.source}>
+                <input type="hidden" name="source" value={action.source} />
+                <button type="submit">
+                  <strong>{action.label}</strong>
+                  <span>{action.detail}</span>
+                </button>
+              </form>
+            ))}
+            <a className="secondary-dashboard-action" href="/dashboard">
+              <strong>Atualizar painel</strong>
+              <span>Recarregar status</span>
+            </a>
+          </div>
         </section>
 
         <section className="dashboard-metrics" aria-label="Resumo do scraping">
           <div className="dashboard-metric"><strong>{jobs.length}</strong><span>jobs recentes</span></div>
           <div className="dashboard-metric"><strong>{visibleItems}</strong><span>itens persistidos</span></div>
+          <div className="dashboard-metric"><strong>4</strong><span>Fontes ativas</span></div>
+          <div className="dashboard-metric"><strong>6h</strong><span>Scheduler 6h</span></div>
           <div className="dashboard-metric"><strong>{successCount}</strong><span>jobs com sucesso</span></div>
+          <div className="dashboard-metric"><strong>{successRate}</strong><span>taxa recente</span></div>
           <div className="dashboard-metric"><strong>{failedCount}</strong><span>falhas visiveis</span></div>
         </section>
 
@@ -471,8 +562,16 @@ export function DashboardPage({ activeTab = "fake", jobs, items, fakeItems, book
           </div>
         </section>
 
-        <SourceTabs activeTab={activeTab} pages={pages} />
-        <ActiveSourceTable activeTab={activeTab} pages={pages} />
+        <section className="source-table-shell" aria-label="Dados extraidos por fonte">
+          <div className="section-head">
+            <div>
+              <h2>Dados extraidos por fonte</h2>
+              <p>Tabelas paginadas com somente a fonte ativa renderizada, para leitura rapida durante a apresentacao.</p>
+            </div>
+          </div>
+          <SourceTabs activeTab={activeTab} pages={pages} />
+          <ActiveSourceTable activeTab={activeTab} pages={pages} />
+        </section>
       </main>
     </>
   );

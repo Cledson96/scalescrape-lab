@@ -30,7 +30,7 @@ const scenarios = [
   {
     title: "Dashboard de extracao",
     href: "/dashboard",
-    description: "Tabela dos itens salvos no banco e botoes para executar os dois scrapings agora.",
+    description: "Tabelas das quatro fontes salvas no banco e botoes para executar coletas agora.",
     tag: "Postgres",
     tone: "blue"
   },

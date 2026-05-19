@@ -23,6 +23,7 @@ test("home renders Procob-inspired scenario links", () => {
   assert.match(html, /href="\/protected\/items\?page=1"/);
   assert.match(html, /href="\/external\/items\?page=1"/);
   assert.match(html, /href="\/dashboard"/);
+  assert.match(html, /quatro fontes/);
 });
 
 test("items page preserves scraper selectors", () => {
@@ -198,7 +199,15 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
     />
   );
 
-  assert.match(html, /Dados extraidos pelo ScaleScrape/);
+  assert.match(html, /Case tecnico autoral para vaga Procob/);
+  assert.match(html, /Scraping distribuido em escala/);
+  assert.match(html, /iniciativa propria para demonstrar competencias/);
+  assert.match(html, /RabbitMQ/);
+  assert.match(html, /Workers Playwright/);
+  assert.match(html, /Docker \+ GitHub Actions/);
+  assert.match(html, /Scheduler 6h/);
+  assert.match(html, /Fontes ativas/);
+  assert.match(html, /class="[^"]*dashboard-control-panel/);
   assert.match(html, /Consultar fake agora/);
   assert.match(html, /Consultar Books agora/);
   assert.match(html, /Consultar Globo agora/);
@@ -214,6 +223,7 @@ test("dashboard renders extracted items table and immediate scrape actions", () 
   assert.match(html, /Books/);
   assert.match(html, /Globo/);
   assert.match(html, /Betano futebol/);
+  assert.match(html, /class="[^"]*source-table-shell/);
   assert.match(html, /https:\/\/dev\.scalescrape\.cledson\.com\.br\/protected\/items\?page=1/);
   assert.doesNotMatch(html, /£35.67 \/ R\$ 231,86/);
   assert.doesNotMatch(html, /Resumo da noticia para o dashboard/);

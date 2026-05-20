@@ -1,21 +1,32 @@
 # ScaleScrape Lab - Case Back-End Pleno Procob
 
 > Case tecnico criado por iniciativa propria para demonstrar aderencia a uma
-> vaga de Desenvolvedor Back-End Pleno com foco em scraping em escala,
+> vaga de Desenvolvedor Back-End Pleno da Procob com foco em scraping em escala,
 > mensageria, performance, observabilidade, Linux, Docker e investigacao de
 > bloqueios. Este material nao representa parceria oficial com a Procob.
 
 ## Resumo Executivo
 
-O ScaleScrape Lab e um laboratorio completo de scraping distribuido. Ele mostra
-como eu desenho, implemento e opero um pipeline de coleta com API, fila,
-workers, browser automation, persistencia, retry, DLQ, circuit breaker,
-observabilidade e deploy automatizado.
+O ScaleScrape Lab e um laboratorio completo de scraping distribuido, construido
+especificamente para demonstrar fit tecnico com a vaga de Desenvolvedor
+Back-End Pleno da Procob. Ele mostra como eu desenho, implemento e opero um
+pipeline de coleta com API, fila, workers, browser automation, persistencia,
+retry, DLQ, circuit breaker, observabilidade e deploy automatizado.
 
 Para RH, a leitura rapida e: o projeto foi feito para provar conhecimento
 pratico nos pontos centrais da vaga. Para engenharia, o repositorio permite
 inspecionar codigo, arquitetura, testes, Docker, CI/CD, metricas e o fluxo de
-dados de ponta a ponta.
+dados de ponta a ponta. O objetivo foi transformar os requisitos da vaga em uma
+demo navegavel e auditavel.
+
+## Imagem Da Aplicacao
+
+![Dashboard ScaleScrape Lab](scalescrape-dashboard-procob-hero.png)
+
+O dashboard centraliza criacao de jobs, metricas operacionais, abas por fonte,
+historico recente e links para Swagger, Grafana e RabbitMQ. A tela foi pensada
+para que RH consiga entender o valor rapidamente e para que a avaliacao tecnica
+consiga abrir os detalhes de arquitetura, dados persistidos e falhas.
 
 ## Links De Demonstracao
 
@@ -43,6 +54,32 @@ nos secrets de cada ambiente.
 | Retry, timeout e falhas | Retry policy, DLQ, status por job, eventos e circuit breaker por fonte. |
 | Linux, Docker e deploy | Docker Compose, GHCR, GitHub Actions, VPS, Nginx externo e migrations Alembic. |
 | Monitoramento e logs | Prometheus, Grafana, RabbitMQ Management, job events e artefatos de debug. |
+
+## Scrapers Implementados
+
+| Fonte | O que demonstra | Dados extraidos |
+| --- | --- | --- |
+| `fake-target` | Site proprio protegido com login, cookies, CAPTCHA de laboratorio e simulador anti-bot. | Itens paginados, categoria, origem, detalhe e data de extracao. |
+| `books-to-scrape` | Fonte publica segura para provar parsing, detalhe e normalizacao. | Titulo, preco em GBP, preco convertido para BRL, nota, descricao e link do livro. |
+| `globo-home` | Coleta de noticias publicas com enriquecimento em pagina de detalhe. | Categoria, titulo, resumo, link publico, imagem original e imagem salva no storage local. |
+| `betano-football` | Fonte mais dificil: site de apostas esportivas com protecoes anti-bot fortes e markup dinamico. | Campeonato, jogo, data/hora, mercado, odds 1/X/2, status de bloqueio e horario da coleta. |
+
+### Por Que A Betano Foi Incluida
+
+A Betano entra no case como fonte de maior dificuldade tecnica. E um site de
+apostas esportivas com frontend dinamico, conteudo sensivel a localizacao,
+modais, sessoes e mecanismos de protecao contra automacao. O projeto nao trata
+isso como promessa de coleta garantida: ele mostra uma abordagem de engenharia
+para diagnosticar e operar com responsabilidade.
+
+O scraper possui fluxo com navegador real via Playwright, browser profile,
+sessao persistida, fechamento de modais quando aparecem, tentativa por API
+publica observada, fallback visual/DOM, proxy proprio via Tailscale quando o IP
+da VPS sofre bloqueio, registro de `403`/redirecionamento/pagina vazia e debug
+artifacts com HTML, screenshot e JSON. Quando a fonte libera o acesso no
+ambiente autorizado, os mercados de futebol sao persistidos como odds
+auditaveis no banco; quando bloqueia, o sistema registra o bloqueio sem entrar
+em loop agressivo.
 
 ## Arquitetura Geral
 
@@ -146,9 +183,10 @@ esses temas aparecem de forma explicita e responsavel:
   mudanca de layout;
 - o browser profile configura sinais de sessao, headers, idioma, viewport e
   contexto do Chromium;
-- a fonte Betano possui diagnostico de bloqueio, proxy proprio/Tailscale e
-  artefatos de debug para entender se houve 403, redirect, pagina vazia ou
-  mudanca de markup;
+- a fonte Betano, por ser um site de apostas com protecoes anti-bot mais fortes,
+  possui diagnostico de bloqueio, proxy proprio/Tailscale, sessao persistida,
+  fallback visual/API e artefatos de debug para entender se houve 403, redirect,
+  pagina vazia ou mudanca de markup;
 - qualquer uso externo deve ser autorizado, controlado e em baixo volume.
 
 O projeto fala sobre anti-bot e bloqueios porque isso e parte do trabalho de
@@ -227,19 +265,21 @@ Prometheus permanecem internos.
 | --- | --- |
 | `fake-target` | Target controlado com login, CAPTCHA, anti-bot e paginacao. |
 | `books-to-scrape` | Fonte publica segura para demonstrar parsing, detalhe e conversao de preco. |
-| `globo-home` | Noticias publicas com categoria, resumo, link e imagem local. |
-| `betano-football` | Fonte mais dificil para demonstrar diagnostico de bloqueio, browser e proxy. |
+| `globo-home` | Noticias publicas por categoria, resumo, link e imagem salva localmente. |
+| `betano-football` | Site de apostas esportivas para demonstrar coleta de odds, browser profile, diagnostico de bloqueio e proxy proprio. |
 
 ## Roteiro De Demonstracao Em 5 Minutos
 
 1. Abrir `https://dev.scalescrape.cledson.com.br/dashboard`.
-2. Mostrar jobs recentes e as abas de dados extraidos.
+2. Mostrar jobs recentes e as abas de dados extraidos, principalmente Globo e Betano.
 3. Clicar em uma acao de scraping manual.
 4. Abrir Swagger e acompanhar `GET /jobs/{id}`.
 5. Abrir RabbitMQ e mostrar filas/consumers.
 6. Abrir Grafana e mostrar metricas.
-7. Explicar retry, DLQ, circuit breaker e idempotencia.
-8. Rodar ou mostrar o benchmark controlado.
+7. Na aba Globo, mostrar categoria, resumo, link e imagem persistida.
+8. Na aba Betano, explicar que a fonte e mais protegida, como o worker registra odds quando consegue acesso e como registra bloqueios/artefatos quando a defesa do site impede a coleta.
+9. Explicar retry, DLQ, circuit breaker e idempotencia.
+10. Rodar ou mostrar o benchmark controlado.
 
 ## Onde Olhar No Repositorio
 

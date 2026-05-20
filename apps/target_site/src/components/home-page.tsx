@@ -1,4 +1,3 @@
-import React from "react";
 
 type HomePageProps = {
   localTotal: number;

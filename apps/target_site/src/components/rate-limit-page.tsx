@@ -1,5 +1,3 @@
-import React from "react";
-
 type RateLimitPageProps = {
   reason: string;
   riskScore: number;

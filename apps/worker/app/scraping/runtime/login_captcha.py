@@ -32,11 +32,10 @@ async def handle_login_if_present(
             raise RuntimeError("reCAPTCHA widget sem data-sitekey")
         source_host = host_from_url(start_url)
         page_url = page.url
-        # 2Captcha API requires a valid public-looking domain/TLD to accept the task.
-        # We swap local docker hosts to the user's real public domain which is 
-        # registered in their Google reCAPTCHA allowed domains.
+        # Normalize internal Docker URLs to the public domain allowed by reCAPTCHA
+        # before submitting the task to the external solver.
         safe_page_url = page_url.replace("http://target-site:", "http://scalescrape.cledson.com.br:")
-        
+
         start = monotonic()
         token = await asyncio.to_thread(provider.solve_recaptcha, sitekey, safe_page_url, source_host)
         CAPTCHA_SOLVE_DURATION.observe(monotonic() - start)

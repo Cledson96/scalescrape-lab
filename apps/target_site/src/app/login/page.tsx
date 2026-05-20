@@ -1,5 +1,3 @@
-import React from "react";
-
 import { LoginPage } from "../../components/login-page";
 import { normalizeNextPath } from "../../lib/auth";
 import { getRecaptchaSiteKey } from "../../lib/recaptcha";

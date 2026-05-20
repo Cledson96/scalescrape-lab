@@ -1,5 +1,3 @@
-import React from "react";
-
 type LoginPageProps = {
   recaptchaSiteKey: string;
   nextPath: string;

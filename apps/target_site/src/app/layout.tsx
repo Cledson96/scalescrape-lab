@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import React from "react";
+import type { ReactNode } from "react";
 
 import { Shell } from "../components/shell";
 import "./globals.css";
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: "Laboratorio local de scraping, risco cadastral e simulacao anti-fraude."
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="pt-BR">
       <head>
@@ -21,4 +21,3 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
-

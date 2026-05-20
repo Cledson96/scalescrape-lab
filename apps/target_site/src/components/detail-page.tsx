@@ -1,5 +1,3 @@
-import React from "react";
-
 import type { PublicRecord } from "../lib/data";
 
 type DetailPageProps = {

@@ -1,5 +1,3 @@
-import React from "react";
-
 import { ItemsPage } from "../../../components/items-page";
 import { getLocalRecords, paginateRecords } from "../../../lib/data";
 import { getPageNumber } from "../../../lib/routes";

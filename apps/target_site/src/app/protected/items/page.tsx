@@ -1,6 +1,4 @@
 import { cookies, headers } from "next/headers";
-import React from "react";
-
 import { ChallengePage } from "../../../components/challenge-page";
 import { ItemsPage } from "../../../components/items-page";
 import { RateLimitPage } from "../../../components/rate-limit-page";

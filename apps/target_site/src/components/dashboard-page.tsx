@@ -1,4 +1,3 @@
-import React from "react";
 import Link from "next/link";
 
 import { getPublicApiBaseUrl, type DashboardData, type ExtractedItem, type JobSummary, type PaginatedItems } from "../lib/dashboard-api";

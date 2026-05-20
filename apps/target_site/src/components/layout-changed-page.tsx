@@ -1,5 +1,3 @@
-import React from "react";
-
 export function LayoutChangedPage() {
   return (
     <main className="content">

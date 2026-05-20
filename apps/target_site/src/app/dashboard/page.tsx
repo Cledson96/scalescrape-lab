@@ -1,5 +1,3 @@
-import React from "react";
-
 import { DashboardPage } from "../../components/dashboard-page";
 import { fetchDashboardData } from "../../lib/dashboard-api";
 

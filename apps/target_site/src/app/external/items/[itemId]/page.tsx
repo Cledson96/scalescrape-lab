@@ -1,5 +1,3 @@
-import React from "react";
-
 import { DetailPage } from "../../../../components/detail-page";
 import { findRecord } from "../../../../lib/data";
 

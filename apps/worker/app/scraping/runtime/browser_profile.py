@@ -54,15 +54,11 @@ async def launch_betano_browser_context(playwright, *, betano_proxy_url: str | N
         },
         storage_state=storage_state,
     )
-    # Align browser-exposed fields with a regular Chromium session.
     await betano_context.add_init_script("""
-        // Avoid exposing automation-only webdriver state.
         Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
 
-        // Provide Chrome runtime fields expected by client-side scripts.
         window.chrome = {runtime: {}, loadTimes: function(){}, csi: function(){}};
 
-        // Populate plugin metadata commonly present in desktop Chromium.
         Object.defineProperty(navigator, 'plugins', {
             get: () => [
                 {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer'},
@@ -71,17 +67,14 @@ async def launch_betano_browser_context(playwright, *, betano_proxy_url: str | N
             ],
         });
 
-        // Keep locale signals consistent with the request headers.
         Object.defineProperty(navigator, 'languages', {get: () => ['pt-BR', 'pt', 'en-US', 'en']});
 
-        // Match notification permission semantics from full Chromium.
         const originalQuery = window.navigator.permissions.query;
         window.navigator.permissions.query = (parameters) =>
             parameters.name === 'notifications'
                 ? Promise.resolve({state: Notification.permission})
                 : originalQuery(parameters);
 
-        // Keep iframe runtime fields consistent with the top-level window.
         const origGetter = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow').get;
         Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
             get: function() {
@@ -92,7 +85,6 @@ async def launch_betano_browser_context(playwright, *, betano_proxy_url: str | N
             }
         });
 
-        // Use stable WebGL vendor strings for reproducible sessions.
         const getParameter = WebGLRenderingContext.prototype.getParameter;
         WebGLRenderingContext.prototype.getParameter = function(parameter) {
             if (parameter === 37445) return 'Intel Inc.';
@@ -100,15 +92,12 @@ async def launch_betano_browser_context(playwright, *, betano_proxy_url: str | N
             return getParameter.call(this, parameter);
         };
 
-        // Normalize network information exposed to page scripts.
         Object.defineProperty(navigator, 'connection', {
             get: () => ({effectiveType: '4g', rtt: 50, downlink: 10, saveData: false}),
         });
 
-        // Expose a realistic desktop CPU profile.
         Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
 
-        // Keep platform aligned with the selected user agent.
         Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});
     """)
     return betano_browser, betano_context, session_path, storage_state

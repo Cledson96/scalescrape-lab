@@ -207,6 +207,16 @@ Durante a execucao, voce consegue mostrar:
 - Prometheus: `http://localhost:9090`;
 - Grafana: `http://localhost:3000`.
 
+Para demonstrar carga controlada, rode:
+
+```bash
+python tools/load_demo.py --api-url http://localhost:8000 --jobs 30 --concurrency 10 --rabbitmq-url http://localhost:15672
+```
+
+O script cria jobs concorrentes, acompanha status terminal e imprime throughput,
+percentis de duracao, retries, itens coletados e resumo das filas `scrape.jobs`,
+`scrape.retry` e `scrape.dead_letter` quando RabbitMQ Management e informado.
+
 Na VPS, as portas publicas ficam atras do Nginx, enquanto Postgres, Prometheus e
 AMQP ficam internos.
 

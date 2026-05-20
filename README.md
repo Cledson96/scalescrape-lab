@@ -88,6 +88,25 @@ Comando manual opcional:
 docker compose run --rm api alembic -c alembic.ini upgrade head
 ```
 
+## Benchmark De Carga Controlado
+
+O script `tools/load_demo.py` dispara jobs concorrentes contra a API e resume
+throughput, status, retries, itens coletados e percentis de duracao. Por padrao
+ele usa `fake-target`, uma fonte interna e estavel para demonstrar volume sem
+depender de terceiros.
+
+Exemplo local com RabbitMQ Management:
+
+```bash
+python tools/load_demo.py --api-url http://localhost:8000 --jobs 30 --concurrency 10 --rabbitmq-url http://localhost:15672
+```
+
+Exemplo rapido:
+
+```bash
+python tools/load_demo.py --api-url http://localhost:8000 --jobs 3 --concurrency 2 --timeout 180
+```
+
 ## Target-Site Visual Em Next.js
 
 O target-site e uma vitrine local do simulador em Next.js 16 com App Router. O

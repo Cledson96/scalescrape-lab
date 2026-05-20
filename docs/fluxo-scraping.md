@@ -159,6 +159,10 @@ Na Betano, o worker usa uma fonte dedicada para futebol:
 
 ## 6. Persistencia E Status
 
+O schema do PostgreSQL e criado e evoluido por Alembic. A migration inicial fica
+em `apps/api/alembic/versions/20260519_0001_initial_schema.py`; localmente e
+possivel rodar `docker compose run --rm api alembic -c alembic.ini upgrade head`.
+
 Ao final, os dados vao para `scraped_items`. O campo `created_at` e exposto pela
 API tambem como `extracted_at`, deixando claro quando cada item foi coletado.
 O mesmo horario e gravado em `raw_data.extracted_at`.

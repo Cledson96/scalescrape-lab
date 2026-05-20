@@ -355,6 +355,28 @@ class ApiStaticArchitectureTests(unittest.TestCase):
         missing = [path for path in expected_files if not (API_PATH / path).exists()]
         self.assertEqual(missing, [])
 
+    def test_api_uses_alembic_migrations_instead_of_runtime_create_all(self) -> None:
+        expected_files = [
+            "alembic.ini",
+            "alembic/env.py",
+            "alembic/versions/20260519_0001_initial_schema.py",
+        ]
+        missing = [path for path in expected_files if not (API_PATH / path).exists()]
+        main_py = (API_PATH / "app" / "main.py").read_text(encoding="utf-8")
+        dockerfile = (API_PATH / "Dockerfile").read_text(encoding="utf-8")
+        pyproject = (API_PATH / "pyproject.toml").read_text(encoding="utf-8")
+        development_workflow = (ROOT / ".github" / "workflows" / "deploy-development.yml").read_text(encoding="utf-8")
+        production_workflow = (ROOT / ".github" / "workflows" / "deploy-production.yml").read_text(encoding="utf-8")
+
+        self.assertEqual(missing, [])
+        self.assertIn("alembic>=1.13", pyproject)
+        self.assertNotIn("create_all", main_py)
+        self.assertIn("COPY apps/api/alembic.ini ./alembic.ini", dockerfile)
+        self.assertIn("COPY apps/api/alembic ./alembic", dockerfile)
+        self.assertIn("alembic -c alembic.ini upgrade head", dockerfile)
+        self.assertIn("alembic -c alembic.ini upgrade head", development_workflow)
+        self.assertIn("alembic -c alembic.ini upgrade head", production_workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

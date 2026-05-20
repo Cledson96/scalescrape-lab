@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api_metadata import APP_DESCRIPTION, OPENAPI_TAGS
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal
 from app.errors import ApiError
 from app.routers import api_routers
 from app.services.bootstrap import seed_defaults
@@ -52,6 +52,5 @@ app = create_app()
 
 @app.on_event("startup")
 def on_startup() -> None:
-    Base.metadata.create_all(bind=engine)
     with SessionLocal() as session:
         seed_defaults(session)

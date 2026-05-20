@@ -201,6 +201,20 @@ jobs:
               docker builder prune -af || true
               docker compose --env-file .env.production -f compose.deploy.yml pull
             fi
+            docker compose --env-file .env.production -f compose.deploy.yml up -d postgres rabbitmq
+            MIGRATED=0
+            for i in $(seq 1 30); do
+              if docker compose --env-file .env.production -f compose.deploy.yml run --rm --no-deps api alembic -c alembic.ini upgrade head; then
+                MIGRATED=1
+                break
+              fi
+              echo "Waiting to run database migrations (${i}/30)"
+              sleep 2
+            done
+            if [ "${MIGRATED}" -ne 1 ]; then
+              echo "Database migrations failed"
+              exit 1
+            fi
             docker compose --env-file .env.production -f compose.deploy.yml up -d --remove-orphans
             docker image prune -f
 

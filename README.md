@@ -54,7 +54,7 @@ Anti-Bot Simulator
 - Celery + RabbitMQ para filas
 - Celery Beat para agendamento periodico a cada 6 horas
 - Playwright Python para scraping
-- PostgreSQL com SQLAlchemy
+- PostgreSQL com SQLAlchemy e Alembic
 - Prometheus + Grafana para monitoramento
 - Provider de CAPTCHA plugavel, com mock local por padrao
 - Docker Compose para infraestrutura local
@@ -75,6 +75,18 @@ Servicos:
 - RabbitMQ UI: http://localhost:15672
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000
+
+## Migrations Do Banco
+
+A API usa Alembic para evoluir o schema do PostgreSQL. No Docker, o container
+da API executa `alembic upgrade head` antes de iniciar o `uvicorn`; nos Actions,
+a mesma migration roda na VPS antes do smoke final.
+
+Comando manual opcional:
+
+```bash
+docker compose run --rm api alembic -c alembic.ini upgrade head
+```
 
 ## Target-Site Visual Em Next.js
 
@@ -294,8 +306,9 @@ portas `11572` (dev) e `11573` (main). Os Actions criam o usuario
 
 Os Actions executam
 testes Python, `npm test`, `npm run typecheck`, `npm run build`, publicam as
-imagens, fazem SSH na VPS, atualizam `.env.production`, sobem a stack e rodam
-smoke de target, API, Grafana e scraping contra
+imagens, fazem SSH na VPS, atualizam `.env.production`, rodam
+`alembic -c alembic.ini upgrade head`, sobem a stack e rodam smoke de target,
+API, Grafana e scraping contra
 `http://target-site:4000/protected/items?page=1`.
 
 Secrets esperados no GitHub:

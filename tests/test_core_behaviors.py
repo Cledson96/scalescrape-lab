@@ -91,9 +91,7 @@ from app.scraping.runtime.debug_artifacts import (  # noqa: E402
     mask_proxy_url,
 )
 from app.scraping.runtime.login_captcha import handle_login_if_present  # noqa: E402
-from app.scraping.sources.betano import (  # noqa: E402
-    _build_betano_api_records,
-)
+from app.scraping.sources.betano_api import build_betano_api_records  # noqa: E402
 from app.jobs.schedule import scheduled_scrape_jobs  # noqa: E402
 
 PolicyError = worker_policy.PolicyError
@@ -216,6 +214,24 @@ class WorkerRuntimeConfigTests(unittest.TestCase):
         self.assertLess(len(tasks_py), 10000)
         self.assertNotIn("from sqlalchemy", tasks_py)
         self.assertNotIn("session.execute(", tasks_py)
+
+    def test_betano_scraper_is_split_by_responsibility(self) -> None:
+        sources_path = ROOT / "apps" / "worker" / "app" / "scraping" / "sources"
+        expected_files = [
+            "betano.py",
+            "betano_api.py",
+            "betano_dom.py",
+            "betano_navigation.py",
+            "betano_parser.py",
+        ]
+        missing = [filename for filename in expected_files if not (sources_path / filename).exists()]
+        betano_py = (sources_path / "betano.py").read_text(encoding="utf-8")
+
+        self.assertEqual(missing, [])
+        self.assertLess(len(betano_py), 18000)
+        self.assertNotIn("def build_betano_api_records", betano_py)
+        self.assertNotIn("def count_betano_visible_odds", betano_py)
+        self.assertNotIn("def accept_betano_age_verification", betano_py)
 
 
 class WorkerSettingsTests(unittest.TestCase):
@@ -577,7 +593,7 @@ class BetanoDiagnosticsTests(unittest.TestCase):
             }
         }
 
-        records = _build_betano_api_records(
+        records = build_betano_api_records(
             payload=payload,
             proxy=ProxyProfileState("proxy-a"),
             max_leagues=10,

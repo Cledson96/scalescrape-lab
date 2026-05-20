@@ -190,6 +190,13 @@ class WorkerRuntimeConfigTests(unittest.TestCase):
 
         self.assertIn("scrape.dead_letter", dockerfile)
 
+    def test_worker_image_installs_playwright_without_mcr_base_image(self) -> None:
+        dockerfile = (ROOT / "apps" / "worker" / "Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn("FROM python:3.12-slim-bookworm", dockerfile)
+        self.assertIn("python -m playwright install --with-deps chromium", dockerfile)
+        self.assertNotIn("mcr.microsoft.com/playwright", dockerfile)
+
     def test_prometheus_server_starts_from_worker_signal_not_import_side_effect(self) -> None:
         celery_app = (ROOT / "apps" / "worker" / "app" / "jobs" / "celery_app.py").read_text(encoding="utf-8")
 

@@ -1,5 +1,34 @@
 # ScaleScrape Lab
 
+## Case Para Desenvolvedor Back-End Pleno
+
+Este repositorio foi criado como um case pratico para demonstrar aderencia a
+uma vaga de Desenvolvedor Back-End Pleno com foco em scraping em escala,
+sistemas distribuidos, mensageria, processamento de alto volume,
+observabilidade e operacao em Linux/Docker.
+
+O projeto mostra, em um ambiente controlado, um pipeline completo com FastAPI,
+RabbitMQ, Celery workers, Playwright, PostgreSQL, Alembic, Prometheus, Grafana,
+Next.js e deploy automatizado em VPS. A documentacao executiva e tecnica do
+case esta em [docs/case-procob-backend-pleno.md](docs/case-procob-backend-pleno.md).
+
+Ambientes publicos de demonstracao:
+
+- Dev UI: https://dev.scalescrape.cledson.com.br
+- Dev dashboard: https://dev.scalescrape.cledson.com.br/dashboard
+- Dev API docs: https://api-dev.scalescrape.cledson.com.br/docs
+- Dev Grafana: https://grafana-dev.scalescrape.cledson.com.br
+- Dev RabbitMQ: https://rabbit-dev.scalescrape.cledson.com.br
+- Producao UI: https://scalescrape.cledson.com.br
+- Producao dashboard: https://scalescrape.cledson.com.br/dashboard
+- Producao API docs: https://api.scalescrape.cledson.com.br/docs
+- Producao Grafana: https://grafana.scalescrape.cledson.com.br
+- Producao RabbitMQ: https://rabbit.scalescrape.cledson.com.br
+
+Credenciais operacionais nao ficam no repositorio. Grafana usa o usuario
+`admin`; RabbitMQ Management usa `scalescrape_viewer`. As senhas ficam nos
+secrets dos ambientes de deploy.
+
 Laboratorio controlado de scraping em escala com Python, RabbitMQ, Playwright,
 PostgreSQL, Prometheus, Grafana, target-site em Next.js/TypeScript, anti-bot
 simulator, proxy rotation local, login protegido e CAPTCHA configuravel para

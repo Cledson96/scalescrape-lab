@@ -374,6 +374,8 @@ class ApiStaticArchitectureTests(unittest.TestCase):
         self.assertIn("COPY apps/api/alembic.ini ./alembic.ini", dockerfile)
         self.assertIn("COPY apps/api/alembic ./alembic", dockerfile)
         self.assertIn("alembic -c alembic.ini upgrade head", dockerfile)
+        self.assertIn("[tool.setuptools.packages.find]", pyproject)
+        self.assertIn('include = ["app*"]', pyproject)
         self.assertIn("alembic -c alembic.ini upgrade head", development_workflow)
         self.assertIn("alembic -c alembic.ini upgrade head", production_workflow)
 

@@ -13,3 +13,6 @@ dependencies = [
   "alembic>=1.13",
 ]
 
+[tool.setuptools.packages.find]
+include = ["app*"]
+

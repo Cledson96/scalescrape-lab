@@ -7,17 +7,16 @@ from app.settings import get_settings
 
 def seed_defaults(session: Session) -> None:
     settings = get_settings()
-    source = session.scalar(
-        select(Source).where(Source.name == settings.default_source_name)
-    )
-    if source is None:
-        session.add(
-            Source(
-                name=settings.default_source_name,
-                base_url=settings.default_source_url,
-                status="active",
-            )
-        )
+    sources = {
+        settings.default_source_name: settings.default_source_url,
+        "books-to-scrape": "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
+        "globo-home": "https://www.globo.com/",
+        "betano-football": "https://www.betano.bet.br/sport/futebol/",
+    }
+    for name, base_url in sources.items():
+        source = session.scalar(select(Source).where(Source.name == name))
+        if source is None:
+            session.add(Source(name=name, base_url=base_url, status="active"))
 
     for name in ("proxy-a", "proxy-b", "proxy-c"):
         proxy = session.scalar(select(ProxyProfile).where(ProxyProfile.name == name))

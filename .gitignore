@@ -16,4 +16,13 @@ playwright-report/
 test-results/
 storage-state.json
 data/
+find_proxy.py
+*-debug/
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
 

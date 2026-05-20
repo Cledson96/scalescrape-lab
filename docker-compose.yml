@@ -28,10 +28,13 @@ services:
 
   api:
     build:
-      context: ./apps/api
+      context: .
+      dockerfile: apps/api/Dockerfile
     env_file: .env
     ports:
       - "8000:8000"
+    volumes:
+      - scraped-media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,10 +43,13 @@ services:
 
   worker:
     build:
-      context: ./apps/worker
+      context: .
+      dockerfile: apps/worker/Dockerfile
     env_file: .env
     ports:
       - "9100:9100"
+    volumes:
+      - scraped-media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,9 +58,24 @@ services:
       target-site:
         condition: service_started
 
+  scheduler:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    env_file: .env
+    command: ["celery", "-A", "app.jobs.celery_app:celery_app", "beat", "--loglevel=INFO"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
   target-site:
     build:
       context: ./apps/target_site
+    environment:
+      TARGET_SITE_FIXED_CAPTCHA_ANSWER: ABCDE
+      SCALESCRAPE_API_URL: ${SCALESCRAPE_API_URL:-http://api:8000}
+      RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe}
     ports:
       - "4000:4000"
 
@@ -79,3 +100,4 @@ services:
 
 volumes:
   postgres-data:
+  scraped-media:

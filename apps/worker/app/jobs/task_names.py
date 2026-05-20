@@ -1,0 +1,3 @@
+from scalescrape_contracts.task_names import DEAD_LETTER_TASK, ENQUEUE_SCHEDULED_TASK, RUN_SCRAPE_TASK
+
+__all__ = ["DEAD_LETTER_TASK", "ENQUEUE_SCHEDULED_TASK", "RUN_SCRAPE_TASK"]

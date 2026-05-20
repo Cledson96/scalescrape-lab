@@ -1,9 +1,32 @@
-FROM python:3.12-slim
+FROM node:24-alpine AS deps
 
 WORKDIR /app
-COPY pyproject.toml .
-RUN pip install --no-cache-dir .
-COPY app ./app
+COPY package.json package-lock.json ./
+RUN npm ci
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "4000"]
+FROM node:24-alpine AS builder
 
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+FROM node:24-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
+ENV PORT=4000
+
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs
+
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+EXPOSE 4000
+
+CMD ["node", "server.js"]

@@ -1,0 +1,27 @@
+{
+  "name": "scalescrape-target-site",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0 --port 4000",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0 --port 4000",
+    "test": "node --test --import tsx tests/*.test.ts tests/*.test.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "6.0.3"
+  }
+}

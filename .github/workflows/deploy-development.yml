@@ -1,0 +1,321 @@
+name: Deploy development
+
+on:
+  push:
+    branches:
+      - development
+
+concurrency:
+  group: scalescrape-development
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  API_IMAGE_NAME: ghcr.io/cledson96/scalescrape-lab-api
+  WORKER_IMAGE_NAME: ghcr.io/cledson96/scalescrape-lab-worker
+  TARGET_SITE_IMAGE_NAME: ghcr.io/cledson96/scalescrape-lab-target-site
+  IMAGE_TAG: development
+
+jobs:
+  deploy:
+    name: Build, publish, and deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test Python
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ./packages/contracts ./apps/api ./apps/worker
+          python -m unittest discover -s tests -v
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/target_site/package-lock.json
+
+      - name: Install target-site dependencies
+        working-directory: apps/target_site
+        run: npm ci
+
+      - name: Test target-site
+        working-directory: apps/target_site
+        run: npm test
+
+      - name: Typecheck target-site
+        working-directory: apps/target_site
+        run: npm run typecheck
+
+      - name: Build target-site
+        working-directory: apps/target_site
+        run: npm run build
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.API_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.API_IMAGE_NAME }}:${{ env.IMAGE_TAG }}-${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/worker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.WORKER_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.WORKER_IMAGE_NAME }}:${{ env.IMAGE_TAG }}-${{ github.sha }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
+
+      - name: Build and push target-site image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/target_site
+          push: true
+          tags: |
+            ${{ env.TARGET_SITE_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.TARGET_SITE_IMAGE_NAME }}:${{ env.IMAGE_TAG }}-${{ github.sha }}
+          cache-from: type=gha,scope=target-site
+          cache-to: type=gha,mode=max,scope=target-site
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          API_IMAGE: ${{ env.API_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          WORKER_IMAGE: ${{ env.WORKER_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          TARGET_SITE_IMAGE: ${{ env.TARGET_SITE_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          COMPOSE_PROJECT_NAME: scalescrape_development
+          TARGET_SITE_PORT: ${{ secrets.DEVELOPMENT_TARGET_SITE_PORT }}
+          API_PORT: ${{ secrets.DEVELOPMENT_API_PORT }}
+          GRAFANA_PORT: ${{ secrets.DEVELOPMENT_GRAFANA_PORT }}
+          POSTGRES_PASSWORD: ${{ secrets.DEVELOPMENT_POSTGRES_PASSWORD }}
+          RABBITMQ_PASSWORD: ${{ secrets.DEVELOPMENT_RABBITMQ_PASSWORD }}
+          RABBITMQ_MANAGEMENT_PORT: ${{ secrets.DEVELOPMENT_RABBITMQ_MANAGEMENT_PORT }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.DEVELOPMENT_GRAFANA_ADMIN_PASSWORD }}
+          TWO_CAPTCHA_API_KEY: ${{ secrets.TWO_CAPTCHA_API_KEY }}
+          RECAPTCHA_SITE_KEY: ${{ secrets.RECAPTCHA_SITE_KEY }}
+          RECAPTCHA_SECRET_KEY: ${{ secrets.RECAPTCHA_SECRET_KEY }}
+          BETANO_PROXY_URL: ${{ secrets.BETANO_PROXY_URL }}
+          BETANO_TAILSCALE_PROXY_HOST: ${{ secrets.BETANO_TAILSCALE_PROXY_HOST }}
+          BETANO_TAILSCALE_PROXY_PORT: ${{ secrets.BETANO_TAILSCALE_PROXY_PORT }}
+          BETANO_TAILSCALE_PROXY_SCHEME: ${{ secrets.BETANO_TAILSCALE_PROXY_SCHEME }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: API_IMAGE,WORKER_IMAGE,TARGET_SITE_IMAGE,COMPOSE_PROJECT_NAME,TARGET_SITE_PORT,API_PORT,GRAFANA_PORT,POSTGRES_PASSWORD,RABBITMQ_PASSWORD,RABBITMQ_MANAGEMENT_PORT,GRAFANA_ADMIN_PASSWORD,TWO_CAPTCHA_API_KEY,RECAPTCHA_SITE_KEY,RECAPTCHA_SECRET_KEY,BETANO_PROXY_URL,BETANO_TAILSCALE_PROXY_HOST,BETANO_TAILSCALE_PROXY_PORT,BETANO_TAILSCALE_PROXY_SCHEME
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEVELOPMENT_VPS_APP_DIR }}"
+            git fetch origin development
+            git checkout development
+            git pull --ff-only origin development
+            if [ -z "${TARGET_SITE_PORT:-}" ]; then TARGET_SITE_PORT=4001; fi
+            if [ -z "${API_PORT:-}" ]; then API_PORT=8001; fi
+            if [ -z "${GRAFANA_PORT:-}" ]; then GRAFANA_PORT=3001; fi
+            if [ -z "${RABBITMQ_MANAGEMENT_PORT:-}" ]; then RABBITMQ_MANAGEMENT_PORT=11572; fi
+            if { [ -z "${BETANO_PROXY_URL:-}" ] || [ "${BETANO_PROXY_URL:-}" = "auto" ]; } && [ -n "${BETANO_TAILSCALE_PROXY_HOST:-}" ]; then
+              if [ -z "${BETANO_TAILSCALE_PROXY_PORT:-}" ]; then BETANO_TAILSCALE_PROXY_PORT=1080; fi
+              if [ -z "${BETANO_TAILSCALE_PROXY_SCHEME:-}" ]; then BETANO_TAILSCALE_PROXY_SCHEME=socks5; fi
+              BETANO_PROXY_URL="${BETANO_TAILSCALE_PROXY_SCHEME}://${BETANO_TAILSCALE_PROXY_HOST}:${BETANO_TAILSCALE_PROXY_PORT}"
+            fi
+            RABBITMQ_MANAGEMENT_USER=scalescrape_viewer
+            cat > .env.production <<ENV
+            COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
+            API_IMAGE=${API_IMAGE}
+            WORKER_IMAGE=${WORKER_IMAGE}
+            TARGET_SITE_IMAGE=${TARGET_SITE_IMAGE}
+            TARGET_SITE_PORT=${TARGET_SITE_PORT}
+            API_PORT=${API_PORT}
+            GRAFANA_PORT=${GRAFANA_PORT}
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            RABBITMQ_DEFAULT_USER=guest
+            RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+            RABBITMQ_MANAGEMENT_PORT=${RABBITMQ_MANAGEMENT_PORT}
+            RABBITMQ_MANAGEMENT_USER=${RABBITMQ_MANAGEMENT_USER}
+            GRAFANA_ADMIN_USER=admin
+            GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+            DATABASE_URL=postgresql+psycopg://postgres:${POSTGRES_PASSWORD}@postgres:5432/scalescrape
+            RABBITMQ_URL=amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672//
+            PUBLIC_TARGET_SITE_URL=https://dev.scalescrape.cledson.com.br
+            PUBLIC_API_URL=https://api-dev.scalescrape.cledson.com.br
+            SCALESCRAPE_API_URL=http://api:8000
+            MEDIA_ROOT=/app/media
+            ENABLE_REAL_2CAPTCHA=true
+            TWO_CAPTCHA_API_KEY=${TWO_CAPTCHA_API_KEY}
+            RECAPTCHA_SITE_KEY=${RECAPTCHA_SITE_KEY}
+            RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
+            ALLOWED_CAPTCHA_HOSTS=target-site,localhost,127.0.0.1
+            MAX_CAPTCHA_SOLVES_PER_RUN=20
+            TARGET_SITE_USERNAME=demo
+            TARGET_SITE_PASSWORD=demo123
+            ENABLE_PROXY_ROTATION=true
+            ALLOWED_PROXY_TARGET_HOSTS=target-site,localhost,127.0.0.1,books.toscrape.com,www.globo.com,www.betano.bet.br
+            GBP_TO_BRL_RATE=6.50
+            GLOBO_MAX_ARTICLES=12
+            BETANO_MAX_LEAGUES=10
+            BETANO_PROXY_URL=${BETANO_PROXY_URL:-auto}
+            BETANO_DEBUG_ARTIFACTS=true
+            BETANO_DEBUG_MAX_ARTIFACTS=40
+            SCRAPER_MAX_ATTEMPTS=3
+            SCRAPER_PAGE_TIMEOUT_SECONDS=120
+            SCRAPER_JOB_TIMEOUT_SECONDS=300
+            ENABLE_SCHEDULED_SCRAPING=true
+            SCHEDULED_SCRAPE_INTERVAL_SECONDS=21600
+            SCHEDULED_PROTECTED_TARGET_URL=http://target-site:4000/protected/items?page=1
+            SCHEDULED_BOOKS_TO_SCRAPE_URL=https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
+            SCHEDULED_GLOBO_HOME_URL=https://www.globo.com/
+            SCHEDULED_BETANO_FOOTBALL_URL=https://www.betano.bet.br/sport/futebol/
+            ENV
+            if ! docker compose --env-file .env.production -f compose.deploy.yml pull; then
+              docker system prune -af || true
+              docker builder prune -af || true
+              docker compose --env-file .env.production -f compose.deploy.yml pull
+            fi
+            docker compose --env-file .env.production -f compose.deploy.yml up -d postgres rabbitmq
+            MIGRATED=0
+            for i in $(seq 1 30); do
+              if docker compose --env-file .env.production -f compose.deploy.yml run --rm --no-deps api alembic -c alembic.ini upgrade head; then
+                MIGRATED=1
+                break
+              fi
+              echo "Waiting to run database migrations (${i}/30)"
+              sleep 2
+            done
+            if [ "${MIGRATED}" -ne 1 ]; then
+              echo "Database migrations failed"
+              exit 1
+            fi
+            docker compose --env-file .env.production -f compose.deploy.yml up -d --remove-orphans
+            docker image prune -f
+
+            for i in $(seq 1 30); do
+              if docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmq-diagnostics -q ping; then
+                break
+              fi
+              echo "Waiting for rabbitmq cli (${i}/30)"
+              sleep 2
+            done
+            docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmqctl add_user "${RABBITMQ_MANAGEMENT_USER}" "${RABBITMQ_PASSWORD}" \
+              || docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmqctl change_password "${RABBITMQ_MANAGEMENT_USER}" "${RABBITMQ_PASSWORD}"
+            docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmqctl set_user_tags "${RABBITMQ_MANAGEMENT_USER}" monitoring
+            docker compose --env-file .env.production -f compose.deploy.yml exec -T rabbitmq rabbitmqctl set_permissions -p / "${RABBITMQ_MANAGEMENT_USER}" "" "" ".*"
+
+            dump_diagnostics() {
+              docker compose --env-file .env.production -f compose.deploy.yml ps || true
+              docker compose --env-file .env.production -f compose.deploy.yml logs --tail=160 target-site api worker scheduler grafana || true
+            }
+
+            wait_for_url() {
+              name="$1"
+              url="$2"
+              attempts="${3:-60}"
+              for i in $(seq 1 "${attempts}"); do
+                if curl -fsS --max-time 15 "${url}" >/dev/null; then
+                  echo "${name} ready"
+                  return 0
+                fi
+                echo "Waiting for ${name} (${i}/${attempts})"
+                sleep 2
+              done
+              echo "${name} did not become ready: ${url}"
+              dump_diagnostics
+              return 1
+            }
+
+            wait_for_basic_auth_url() {
+              name="$1"
+              url="$2"
+              user="$3"
+              password="$4"
+              attempts="${5:-60}"
+              for i in $(seq 1 "${attempts}"); do
+                if curl -fsS --max-time 15 -u "${user}:${password}" "${url}" >/dev/null; then
+                  echo "${name} ready"
+                  return 0
+                fi
+                echo "Waiting for ${name} (${i}/${attempts})"
+                sleep 2
+              done
+              echo "${name} did not become ready: ${url}"
+              dump_diagnostics
+              return 1
+            }
+
+            wait_for_url target-site "http://127.0.0.1:${TARGET_SITE_PORT}/" 90
+            wait_for_url api "http://127.0.0.1:${API_PORT}/health" 90
+            wait_for_url grafana "http://127.0.0.1:${GRAFANA_PORT}/api/health" 90
+            wait_for_basic_auth_url rabbitmq-management "http://127.0.0.1:${RABBITMQ_MANAGEMENT_PORT}/api/overview" "${RABBITMQ_MANAGEMENT_USER}" "${RABBITMQ_PASSWORD}" 90
+
+            JOB_RESPONSE=""
+            for i in $(seq 1 20); do
+              if JOB_RESPONSE=$(curl -fsS --max-time 20 -X POST "http://127.0.0.1:${API_PORT}/jobs" -H "Content-Type: application/json" -d '{"source":"fake-target","start_url":"http://target-site:4000/protected/items?page=1","mode":"browser","max_pages":1}'); then
+                break
+              fi
+              echo "Waiting to create smoke job (${i}/20)"
+              sleep 2
+            done
+            if [ -z "${JOB_RESPONSE}" ]; then
+              echo "Could not create smoke job"
+              dump_diagnostics
+              exit 1
+            fi
+            JOB_ID=$(printf '%s' "${JOB_RESPONSE}" | sed -n 's/.*"id":\([0-9][0-9]*\).*/\1/p')
+            if [ -z "${JOB_ID}" ]; then
+              echo "Could not parse smoke job id: ${JOB_RESPONSE}"
+              dump_diagnostics
+              exit 1
+            fi
+            JOB_STATUS_JSON=""
+            for i in $(seq 1 90); do
+              JOB_STATUS_JSON=$(curl -fsS --max-time 20 "http://127.0.0.1:${API_PORT}/jobs/${JOB_ID}" || true)
+              if [ -z "${JOB_STATUS_JSON}" ]; then
+                echo "Waiting for smoke job response (${i}/60)"
+                sleep 2
+                continue
+              fi
+              if printf '%s' "${JOB_STATUS_JSON}" | grep -q '"status":"success"'; then
+                ITEMS_FOUND=$(printf '%s' "${JOB_STATUS_JSON}" | sed -n 's/.*"items_found":\([0-9][0-9]*\).*/\1/p')
+                if [ "${ITEMS_FOUND:-0}" -gt 0 ]; then
+                  exit 0
+                fi
+              fi
+              if printf '%s' "${JOB_STATUS_JSON}" | grep -Eq '"status":"(failed|blocked|blocked_by_policy|rate_limited)"'; then
+                echo "Smoke scraping failed: ${JOB_STATUS_JSON}"
+                dump_diagnostics
+                exit 1
+              fi
+              sleep 2
+            done
+            echo "Smoke scraping timed out: ${JOB_STATUS_JSON}"
+            dump_diagnostics
+            exit 1

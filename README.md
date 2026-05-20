@@ -1,5 +1,50 @@
 # ScaleScrape Lab
 
+## Case Para Desenvolvedor Back-End Pleno
+
+Este repositorio foi criado especificamente como case pratico para a vaga de
+Desenvolvedor Back-End Pleno da Procob. A ideia e mostrar, com codigo rodando,
+aderencia direta aos pontos da oportunidade: scraping em escala, sistemas
+distribuidos, mensageria, processamento de alto volume, observabilidade,
+debug de rede e operacao em Linux/Docker. Este projeto nao representa parceria
+oficial com a Procob.
+
+O projeto mostra, em um ambiente controlado, um pipeline completo com FastAPI,
+RabbitMQ, Celery workers, Playwright, PostgreSQL, Alembic, Prometheus, Grafana,
+Next.js e deploy automatizado em VPS. A documentacao executiva e tecnica do
+case esta em [docs/case-procob-backend-pleno.md](docs/case-procob-backend-pleno.md).
+
+![Dashboard ScaleScrape Lab](docs/scalescrape-dashboard-procob-hero.png)
+
+Ambientes publicos de demonstracao:
+
+- Dev UI: https://dev.scalescrape.cledson.com.br
+- Dev dashboard: https://dev.scalescrape.cledson.com.br/dashboard
+- Dev API docs: https://api-dev.scalescrape.cledson.com.br/docs
+- Dev Grafana: https://grafana-dev.scalescrape.cledson.com.br
+- Dev RabbitMQ: https://rabbit-dev.scalescrape.cledson.com.br
+- Producao UI: https://scalescrape.cledson.com.br
+- Producao dashboard: https://scalescrape.cledson.com.br/dashboard
+- Producao API docs: https://api.scalescrape.cledson.com.br/docs
+- Producao Grafana: https://grafana.scalescrape.cledson.com.br
+- Producao RabbitMQ: https://rabbit.scalescrape.cledson.com.br
+
+Credenciais operacionais nao ficam no repositorio. Grafana usa o usuario
+`admin`; RabbitMQ Management usa `scalescrape_viewer`. As senhas ficam nos
+secrets dos ambientes de deploy.
+
+Fontes demonstradas no dashboard:
+
+- `fake-target`: site proprio protegido por login, sessao, cookies, CAPTCHA de
+  laboratorio e simulador anti-bot.
+- `books-to-scrape`: catalogo publico usado para extrair titulo, preco original,
+  preco convertido para real, nota e descricao.
+- `globo-home`: home publica da Globo, com coleta de noticias por categoria,
+  resumo, link e imagem salva localmente.
+- `betano-football`: site de apostas esportivas, usado como fonte mais dificil
+  para demonstrar diagnostico de bloqueios, browser profile, sessao, proxy
+  proprio/Tailscale, fallback visual/API e persistencia de odds de futebol.
+
 Laboratorio controlado de scraping em escala com Python, RabbitMQ, Playwright,
 PostgreSQL, Prometheus, Grafana, target-site em Next.js/TypeScript, anti-bot
 simulator, proxy rotation local, login protegido e CAPTCHA configuravel para
@@ -196,6 +241,23 @@ Visualmente, a rota `/dashboard` do target-site mostra:
 - `public_url` para o dominio publico da demo;
 - thumbnails da Globo servidas pela API;
 - botoes para consultar agora cada fonte ou todas juntas.
+
+### Scrapers Reais Em Destaque
+
+O scraper da Globo usa a home publica para demonstrar coleta de noticias em
+uma fonte real: o worker identifica cards, classifica por categoria, abre a
+pagina de detalhe, le metadados `og:title`, `og:description` e `og:image`,
+baixa a imagem para o volume compartilhado e disponibiliza a thumbnail no
+dashboard.
+
+O scraper da Betano foi incluido por ser uma fonte mais dificil: e um site de
+apostas esportivas com frontend dinamico, modais, sessao, conteudo sensivel a
+rede/localizacao e protecoes fortes contra automacao. O worker usa Playwright,
+browser profile, sessao persistida, tentativa por API observada, fallback
+visual/DOM, proxy proprio via Tailscale e artefatos de debug. Quando a fonte
+libera acesso no ambiente autorizado, o sistema persiste campeonato, jogo,
+data/hora, mercado e odds `1/X/2`; quando bloqueia, registra `403`, pagina
+vazia ou mudanca de markup sem entrar em loop agressivo.
 
 Em dev, acesse:
 
